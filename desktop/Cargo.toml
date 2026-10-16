@@ -1,0 +1,9 @@
+[workspace]
+members = ["bridge-core"]
+resolver = "2"
+
+[workspace.package]
+version = "0.4.0"
+edition = "2021"
+license = "MIT"
+authors = ["tianrking <10758833+tianrking@users.noreply.github.com>"]

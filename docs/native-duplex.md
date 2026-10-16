@@ -91,3 +91,48 @@ Friendly names come from native Discover, not from MAC-derived aliases.
 This run qualifies one Mac, one binary size and the recorded image. iPhone,
 contact-only authentication, folders, larger files, sustained load, lifetime
 visibility and the Tauri desktop workflow remain separate release gates.
+
+## Additional multi-record binary roundtrip
+
+The same application and boot-local identity subsequently completed
+`AirBridge-native-duplex-262145.bin`, 262,145 bytes, in both native directions.
+All three actual files had SHA256
+`785077484ec9374f84e09766ab47fa09c12d4df8f216ab2fdd5a1494aea609e7`.
+The outgoing archive crossed five 64 KiB stored DvZip records. Native upload
+HTTP 200, host commit and the return response were all confirmed. The serial
+port was closed and reopened before this send, without resetting the board.
+The machine-readable receipt includes both transfer IDs and results.
+
+## Rust host backend acceptance
+
+The standalone `desktop/bridge-core` crate directly controls serial; it does not
+launch or import Python. Its serial actor validates the same USB identity, stages
+the source with CRC/session/offset checks, builds a binary-plist manifest, services
+incoming chunk/commit acknowledgements and publishes checked files with receipts.
+
+`AirBridge-Rust-native-4097.bin`, 4,097 bytes, completed a native Rust → Mac → Rust
+roundtrip with all actual copies matching SHA256
+`f884c184250242865af438f9aeceac67b2941b74eec91df25863a5ccd931676f`.
+The firmware application was unchanged. Its fresh boot-local identity for this
+run was `b2:30:4a:b3:45:1a`. The Rust CLI remained the only serial owner throughout
+both transfer directions. Six Rust protocol/storage tests and Clippy with warnings
+as errors passed separately from this hardware acceptance.
+
+Two prior attempts on the aged `ce:f8:6b:4a:61:22` identity timed out before TLS.
+Mac logs showed the BLE-triggered receive server starting, but its `awdl0` capture
+showed no corresponding TCP traffic. A board reset restored native communication
+with a fresh identity. This does not solve long-idle discoverability. Preserve
+that failure as an open release gate; do not count a fresh-boot success as a
+lifetime reliability qualification.
+
+Build and run the Rust development receiver with:
+
+```powershell
+cargo test --manifest-path desktop/Cargo.toml --locked
+cargo run --manifest-path desktop/Cargo.toml -p airbridge-host -- --directory received/rust --seconds 0
+```
+
+Add `--send <file> --peer <fresh AWDL MAC>` for an outgoing operation. Stop any
+other serial owner first. The development binding still excludes COM3 and checks
+the replacement board's USB serial before opening COM4. This is a host-backend
+qualification; a desktop-window workflow requires separate acceptance.

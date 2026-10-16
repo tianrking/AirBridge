@@ -54,5 +54,56 @@
     "close_reopen_cycles": 4,
     "checks_per_cycle": 18,
     "radio_identity_unchanged": true
+  },
+  "additional_binary": {
+    "name": "AirBridge-native-duplex-262145.bin",
+    "size": 262145,
+    "windows_source_sha256": "785077484ec9374f84e09766ab47fa09c12d4df8f216ab2fdd5a1494aea609e7",
+    "actual_mac_destination_sha256": "785077484ec9374f84e09766ab47fa09c12d4df8f216ab2fdd5a1494aea609e7",
+    "actual_windows_return_sha256": "785077484ec9374f84e09766ab47fa09c12d4df8f216ab2fdd5a1494aea609e7",
+    "outgoing": {
+      "event": "outgoing_complete",
+      "success": true,
+      "error": 0,
+      "http_status": 200,
+      "transfer_id": "970EA8D8-3AFA-4BCA-9F63-380400189064",
+      "bytes": 262145,
+      "sha256": "785077484ec9374f84e09766ab47fa09c12d4df8f216ab2fdd5a1494aea609e7",
+      "elapsed_ms": 152091
+    },
+    "incoming": {
+      "event": "transfer_complete",
+      "transfer_id": "58BF4505-2474-4747-B9AB-6053E5DFD1B2",
+      "host_committed": true,
+      "response_written": true
+    },
+    "radio_identity_unchanged": true,
+    "serial_reopened_before_send": true
+  },
+  "rust_host": {
+    "native_roundtrip_verified": true,
+    "python_used_for_transfer": false,
+    "file": "AirBridge-Rust-native-4097.bin",
+    "bytes": 4097,
+    "windows_source_sha256": "f884c184250242865af438f9aeceac67b2941b74eec91df25863a5ccd931676f",
+    "actual_mac_destination_sha256": "f884c184250242865af438f9aeceac67b2941b74eec91df25863a5ccd931676f",
+    "actual_windows_return_sha256": "f884c184250242865af438f9aeceac67b2941b74eec91df25863a5ccd931676f",
+    "awdl_mac": "b2:30:4a:b3:45:1a",
+    "outgoing": {
+      "bytes": 4097,
+      "elapsed_ms": 58411,
+      "error": 0,
+      "event": "outgoing_complete",
+      "http_status": 200,
+      "sha256": "f884c184250242865af438f9aeceac67b2941b74eec91df25863a5ccd931676f",
+      "success": true,
+      "transfer_id": "B30C11C6-62BD-4D25-A507-15AD20CB5D69"
+    },
+    "incoming_transfer_id": "381BDAF8-2AF4-4A8C-80F6-7656A1CB9119",
+    "backend_executable_sha256": "de0f25084d1b2e3cadf90e0727c187c57e8c9edfa676cf7d2445b1f78df9e243",
+    "portable_tests": 6,
+    "clippy_warnings_denied": true,
+    "prior_aged_identity_tcp_timeouts": 2,
+    "fresh_boot_required_for_this_run": true
   }
 }
