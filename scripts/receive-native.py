@@ -20,6 +20,24 @@ def safe_name(name):
         return False
     return True
 
+class SerialLines:
+    """Preserve incomplete records across serial read timeouts."""
+    def __init__(self):
+        self.pending = bytearray()
+
+    def feed(self, data):
+        self.pending.extend(data)
+        records = []
+        while b'\n' in self.pending:
+            at = self.pending.index(b'\n')
+            if at > 16384:
+                raise ValueError('Serial line exceeds bound')
+            records.append(bytes(self.pending[:at]))
+            del self.pending[:at+1]
+        if len(self.pending) > 16384:
+            raise ValueError('Serial line exceeds bound')
+        return records
+
 class Receiver:
     def __init__(self, directory, acknowledge):
         self.directory = Path(directory).resolve()
@@ -139,7 +157,7 @@ def main():
     parser.add_argument('--serial', default='F0:9E:9E:1E:61:3C')
     parser.add_argument('--directory', type=Path, required=True)
     parser.add_argument('--log', type=Path, required=True)
-    parser.add_argument('--seconds', type=int, default=300)
+    parser.add_argument('--seconds', type=int, default=300, help='Run duration; 0 keeps the receiver running')
     args = parser.parse_args()
     ports = [p for p in list_ports.comports() if p.device == args.port]
     if len(ports) != 1 or ports[0].serial_number != args.serial or args.port != 'COM4':
@@ -152,20 +170,22 @@ def main():
     try:
         with connection, args.log.open('w', encoding='utf-8') as log:
             print('Verified COM4; waiting for native AirDrop upload', flush=True)
-            deadline = time.monotonic() + args.seconds
+            if args.seconds < 0:
+                raise ValueError('Duration must be nonnegative')
+            deadline = time.monotonic() + args.seconds if args.seconds else float('inf')
+            lines = SerialLines()
             while time.monotonic() < deadline:
-                raw = connection.readline()
-                if len(raw) > 16384:
-                    raise ValueError('Serial line exceeds bound')
-                try:
-                    event = json.loads(raw.decode('utf-8'))
-                except (ValueError, UnicodeError):
-                    continue
-                log.write(json.dumps(event, ensure_ascii=True)+'\n')
-                log.flush()
-                receiver.handle(event)
-                if event.get('event') in ('native_receiver_ready', 'native_receiver_failed', 'native_tls_ready', 'native_tls_failed', 'native_request', 'ask_rejected'):
-                    print(json.dumps(event, ensure_ascii=True), flush=True)
+                data = connection.read(max(1, min(connection.in_waiting, 4096)))
+                for raw in lines.feed(data):
+                    try:
+                        event = json.loads(raw.decode('utf-8'))
+                    except (ValueError, UnicodeError):
+                        continue
+                    log.write(json.dumps(event, ensure_ascii=True)+'\n')
+                    log.flush()
+                    receiver.handle(event)
+                    if event.get('event') in ('native_receiver_ready', 'native_receiver_failed', 'native_tls_ready', 'native_tls_failed', 'native_request', 'ask_rejected'):
+                        print(json.dumps(event, ensure_ascii=True), flush=True)
     finally:
         receiver.close()
 

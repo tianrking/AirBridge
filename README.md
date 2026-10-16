@@ -16,7 +16,7 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-macOS Finder discovered **AirBridge PC** and sent text and a 262,145-byte binary to Windows. Source and received-file SHA256 matched. Long-term discoverability and independent file sending remain open.
+Native binary receiving passed SHA256 verification. The Windows receiver now preserves fragmented serial records and supports resident operation. Long-term discoverability and independent sending remain open.
 
 | Capability | Status |
 | :--- | :--- |
@@ -90,7 +90,7 @@ idf.py -C firmware -B work/native -p COM4 flash
 ### 4. Start the Windows receiver
 
 ```powershell
-python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 300
+python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 0
 ```
 
 Keep the CLI running. Unlock the Mac, enable Everyone in AirDrop, then share a file from Finder to **AirBridge PC**. Compare the source SHA256 with the receipt and the actual Windows file. Close any old Waiting dialog before retrying.
@@ -99,7 +99,7 @@ Each serial chunk must be acknowledged. Windows checks sizes and SHA256, flushes
 
 ## Verification
 
-**Portable protocol assertions: 277.** **Windows receiver tests: 11.**
+**Portable protocol assertions: 277.** **Windows receiver tests: 12.**
 
 The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Host tests exercise offset, digest and durable-publication failures. Hardware evidence is recorded separately.
 

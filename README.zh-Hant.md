@@ -16,7 +16,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 ## 專案狀態
 
-macOS Finder 已找到 **AirBridge PC**，並將文字檔與 262,145 位元組二進位檔傳至 Windows，來源與接收檔案的 SHA256 一致。長時間可發現性與獨立傳送功能仍待完成。
+原生二進位檔接收已通過 SHA256 驗證。Windows 接收端新增分段序列資料保留與常駐執行功能；長時間可發現性與獨立傳送仍待完成。
 
 | 功能 | 狀態 |
 | :--- | :--- |
@@ -90,7 +90,7 @@ idf.py -C firmware -B work/native -p COM4 flash
 ### 4. 啟動 Windows 接收端
 
 ```powershell
-python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 300
+python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 0
 ```
 
 保持 CLI 執行。將 Mac 解鎖並把 AirDrop 設為所有人，從 Finder 分享檔案至 **AirBridge PC**，再比對來源 SHA256、接收紀錄與 Windows 實際檔案。重試前請關閉舊的 Waiting 分享視窗。
@@ -99,7 +99,7 @@ python scripts/receive-native.py --directory received/inbox --log work/receive.j
 
 ## 驗證
 
-**可攜式協定檢查: 277.** **Windows 接收端測試: 11.**
+**可攜式協定檢查: 277.** **Windows 接收端測試: 12.**
 
 可攜式測試涵蓋畸形封包、邊界、同步與協定線格式；主機測試檢查偏移、雜湊與可靠落盤的失敗情況。實機證據另行記錄。
 

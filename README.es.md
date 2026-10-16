@@ -16,7 +16,7 @@ AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows medi
 
 ## Estado del proyecto
 
-Finder de macOS encontró **AirBridge PC** y envió texto y un binario de 262.145 bytes a Windows. Los SHA256 de origen y destino coincidieron. La detección prolongada y el envío independiente siguen pendientes.
+La recepción nativa de un binario superó la verificación SHA256. El receptor de Windows ahora conserva registros serie fragmentados y permite ejecución continua. La detección prolongada y el envío independiente siguen pendientes.
 
 | Función | Estado |
 | :--- | :--- |
@@ -90,7 +90,7 @@ idf.py -C firmware -B work/native -p COM4 flash
 ### 4. Iniciar el receptor de Windows
 
 ```powershell
-python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 300
+python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 0
 ```
 
 Mantenga la CLI abierta. Desbloquee el Mac, active Todos en AirDrop y comparta un archivo desde Finder con **AirBridge PC**. Compare el SHA256 de origen con el recibo y con el archivo real de Windows. Cierre cualquier diálogo antiguo de Waiting antes de reintentar.
@@ -99,7 +99,7 @@ Cada bloque serie requiere confirmación. Windows verifica tamaños y SHA256, si
 
 ## Verificación
 
-**Comprobaciones del protocolo portátil: 277.** **Pruebas del receptor de Windows: 11.**
+**Comprobaciones del protocolo portátil: 277.** **Pruebas del receptor de Windows: 12.**
 
 Las pruebas portátiles cubren tramas malformadas, límites, sincronización y datos del protocolo. Las pruebas del equipo comprueban fallos de desplazamiento, hash y publicación duradera. Las evidencias de hardware se registran por separado.
 

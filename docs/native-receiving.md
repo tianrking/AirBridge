@@ -79,6 +79,10 @@ with presence, IPv6, native service and the current Apple peer's AWDL MAC:
 python scripts/receive-native.py --directory received/test --log work/receive.jsonl --seconds 300
 ```
 
+Use `--seconds 0` for a resident host receiver. Serial records are buffered across
+read timeouts, including split UTF-8 sequences; oversized records fail closed.
+Closing the CLI stops host reception, so keep one instance running while sharing.
+
 The MAC above is a placeholder. The host CLI currently requires the explicitly
 authorized replacement COM4 and verifies its USB serial before opening it. It
 must be the only serial owner. The development build uses 16 MiB flash and

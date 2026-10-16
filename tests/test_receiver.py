@@ -13,6 +13,16 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 class ReceiveContract(unittest.TestCase):
+    def test_serial_fragments_survive_timeout_and_reject_overflow(self):
+        lines = module.SerialLines()
+        wire = '{"name":"测试"}\n'.encode('utf-8')
+        self.assertEqual(lines.feed(wire[:11]), [])
+        self.assertEqual(lines.feed(b''), [])
+        self.assertEqual(lines.feed(wire[11:]+b'{}\n'), [wire[:-1], b'{}'])
+        with self.assertRaises(ValueError):
+            lines.feed(b'x'*16385)
+        with self.assertRaises(ValueError):
+            module.SerialLines().feed(b'x'*16385+b'\n')
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.acks = []
