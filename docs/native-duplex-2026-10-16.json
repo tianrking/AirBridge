@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "date": "2026-10-16",
+  "implementation": "Independent C++17 and ESP-IDF native sender/receiver",
+  "firmware_application_sha256": "d10b0b293e25edbba744e156d8c297b4ee6141b1babd7357db1b4b23fb307024",
+  "platform": {
+    "bridge": "ESP32-S3",
+    "sdk": "ESP-IDF 6.1",
+    "transport": "native USB Serial/JTAG",
+    "usb_serial": "F0:9E:9E:1E:61:3C",
+    "port": "COM4",
+    "awdl_mac": "ce:f8:6b:4a:61:22",
+    "legacy_rate": "1 Mbps",
+    "calibration": "full",
+    "apple": "MacBook Pro; Finder native AirDrop"
+  },
+  "file": {
+    "name": "AirBridge-native-send-65537.bin",
+    "size": 65537,
+    "windows_source_sha256": "79a270a3d8772b20bcfd151c835afe2853483336ff82fee0b7a706924c47d88d",
+    "actual_mac_destination_sha256": "79a270a3d8772b20bcfd151c835afe2853483336ff82fee0b7a706924c47d88d",
+    "actual_windows_return_sha256": "79a270a3d8772b20bcfd151c835afe2853483336ff82fee0b7a706924c47d88d"
+  },
+  "outgoing": {
+    "event": "outgoing_complete",
+    "success": true,
+    "error": 0,
+    "http_status": 200,
+    "transfer_id": "AB3595DF-C732-4A4A-8623-AF10635C77B0",
+    "bytes": 65537,
+    "sha256": "79a270a3d8772b20bcfd151c835afe2853483336ff82fee0b7a706924c47d88d",
+    "elapsed_ms": 184080
+  },
+  "incoming": {
+    "event": "transfer_complete",
+    "transfer_id": "DB08E877-47FB-44C8-B56B-6F7F0AB96177",
+    "host_committed": true,
+    "response_written": true
+  },
+  "same_firmware_roundtrip": true,
+  "reset_observed_during_transfer": false,
+  "native_user_consent": true,
+  "ssh_used_for": "Read actual Mac destination size and SHA256; no file payload transfer",
+  "limitations": [
+    "One explicit peer",
+    "Outgoing staging at most 1 MiB",
+    "No iPhone qualification",
+    "No external UART qualification",
+    "No desktop application yet",
+    "Lifetime discovery and sustained load unqualified"
+  ],
+  "serial_recovery": {
+    "prior_record_serialization_image_sha256": "154117e8d22924f1927cf35310491045e02bf8e6a9bf450da96686ffc228755e",
+    "close_reopen_cycles": 4,
+    "checks_per_cycle": 18,
+    "radio_identity_unchanged": true
+  }
+}

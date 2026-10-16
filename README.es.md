@@ -14,7 +14,7 @@ AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows medi
 
 ## Estado del proyecto
 
-Finder de macOS encontró **AirBridge PC** y entregó un binario de 262.145 bytes con SHA256 coincidente en origen y destino. Tanto el perfil de 6 Mbps como la comparación de anuncios dirigidos a 1 Mbps superaron pruebas acotadas de recepción nativa.
+Finder de macOS encontró **AirBridge PC** y entregó un binario de 262.145 bytes con SHA256 coincidente en origen y destino. Tanto el perfil de 6 Mbps como la comparación de anuncios dirigidos a 1 Mbps superaron pruebas acotadas de recepción nativa. El emisor independiente también entregó un binario de 65.537 bytes al Mac y lo recibió de vuelta con el mismo firmware; los SHA256 de las tres copias reales coinciden.
 
 | Función | Estado |
 | :--- | :--- |
@@ -23,7 +23,7 @@ Finder de macOS encontró **AirBridge PC** y entregó un binario de 262.145 byte
 | IPv6 sobre AWDL | Verificado en hardware |
 | Nombres nativos de dispositivos | Verificados mediante TLS `/Discover` |
 | Archivos de Mac → Windows | Texto y binario de 262.145 bytes verificados |
-| Archivos de Windows → Mac | Aún no implementado |
+| Archivos de Windows → Mac | Binario de 65.537 bytes e ida y vuelta con el mismo firmware verificados |
 | Aplicación de escritorio | Tauri 2 · React · TypeScript · Rust — prevista |
 
 <details>
@@ -98,9 +98,25 @@ Mantenga la CLI abierta. Desbloquee el Mac, active Todos en AirDrop y comparta u
 
 Cada bloque serie requiere confirmación. Windows verifica tamaños y SHA256, sincroniza los archivos con el disco y publica el directorio temporal antes de confirmar la transferencia. Los recibos se guardan junto a los directorios completos; los datos `.partial` fallidos se conservan para diagnóstico.
 
+### 5. Enviar desde Windows
+
+Detenga primero cualquier receptor independiente. El emisor controla el mismo
+puerto serie y procesa las recepciones mientras espera el consentimiento de Apple.
+
+```powershell
+python scripts/send-native.py C:\path\to\file.bin --peer $peer `
+  --directory received/inbox --log work/duplex.jsonl --listen-after
+```
+
+Acepte la solicitud nativa de AirDrop en el Mac. La CLI distingue la preparación,
+el consentimiento, la transmisión del contenedor y la respuesta HTTP nativa, y
+obtiene el nombre del dispositivo mediante `/Discover`. El envío inicial admite
+un archivo de hasta 1 MiB; el SHA256 del archivo guardado requiere una validación
+independiente. Los resultados fallidos o inciertos nunca se reenvían automáticamente.
+
 ## Verificación
 
-**Comprobaciones del protocolo portátil: 277.** **Pruebas del receptor de Windows: 12.**
+**Comprobaciones del protocolo portátil: 281.** **Pruebas del host de Windows: 20.**
 
 Las pruebas portátiles cubren tramas malformadas, límites, sincronización y datos del protocolo. Las pruebas del equipo comprueban fallos de desplazamiento, hash y publicación duradera. Las evidencias de hardware se registran por separado.
 
@@ -115,7 +131,7 @@ ctest --test-dir build -C Release --output-on-failure
 ```
 
 ```powershell
-python -m unittest discover -s tests -p test_receiver.py -q
+python -m unittest discover -s tests -p "test_*.py" -q
 ```
 
 ## Arquitectura
@@ -143,6 +159,9 @@ La MAC AWDL, la instancia DNS, la etiqueta del host y el nombre de AirDrop son i
 
 ## Documentación y evidencias
 
+- [Validación dúplex nativa](docs/native-duplex.md)
+- [Protocolo de control serie](docs/serial-protocol.md)
+- [Criterios de aceptación del producto](docs/product-acceptance.md)
 - [Referencias del protocolo](docs/protocol-references.md)
 - [Aceptación de vecinos AWDL](docs/awdl-qualification.md)
 - [Intercambio de datos IPv6](docs/ipv6-qualification.md)
@@ -154,7 +173,7 @@ La MAC AWDL, la instancia DNS, la etiqueta del host y el nombre de AirDrop son i
 
 ## Próximos pasos
 
-- [ ] Envío independiente de Windows a Apple y transferencias de ida y vuelta verificadas
+- [x] Envío independiente de Windows a Apple e ida y vuelta binaria con el mismo firmware verificados
 - [ ] Detección estable, recuperación de conexiones y estados de error claros
 - [ ] Selección de más dispositivos, nombres reales y progreso de transferencia
 - [ ] Aplicación de escritorio con Tauri 2, React, TypeScript y Rust

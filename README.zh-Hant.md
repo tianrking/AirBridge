@@ -14,7 +14,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 ## 專案狀態
 
-macOS Finder 已找到 **AirBridge PC**，並成功傳送 262,145 位元組二進位檔，來源與接收端 SHA256 一致。6 Mbps 與定向公告／1 Mbps 對照設定均通過限定範圍的原生接收驗證。
+macOS Finder 已找到 **AirBridge PC**，並成功傳送 262,145 位元組二進位檔，來源與接收端 SHA256 一致。6 Mbps 與定向公告／1 Mbps 對照設定均通過限定範圍的原生接收驗證。獨立實作的傳送端也已將 65,537 位元組二進位檔原生傳至 Mac，再以同一韌體接收回傳；三份實際檔案的 SHA256 完全一致。
 
 | 功能 | 狀態 |
 | :--- | :--- |
@@ -23,7 +23,7 @@ macOS Finder 已找到 **AirBridge PC**，並成功傳送 262,145 位元組二�
 | AWDL 上的 IPv6 | 已通過實機驗證 |
 | 原生裝置名稱 | 已透過 TLS `/Discover` 驗證 |
 | Mac → Windows 檔案接收 | 已驗證文字檔與 262,145 位元組二進位檔 |
-| Windows → Mac 檔案傳送 | 尚未實作 |
+| Windows → Mac 檔案傳送 | 已驗證 65,537 位元組二進位檔與同韌體往返 |
 | 桌面應用程式 | Tauri 2 · React · TypeScript · Rust — 規劃中 |
 
 <details>
@@ -98,9 +98,20 @@ python scripts/receive-native.py --directory received/inbox --log work/receive.j
 
 每個序列資料區塊都必須獲得確認。Windows 會檢查大小與 SHA256、寫入磁碟並發佈暫存目錄後，才確認傳輸。接收紀錄存於完成目錄旁；失敗的 `.partial` 資料保留供診斷。
 
+### 5. 從 Windows 傳送
+
+請先停止獨立接收程序。傳送 CLI 使用同一條序列埠連線，等待 Apple 原生同意時也能處理接收記錄。
+
+```powershell
+python scripts/send-native.py C:\path\to\file.bin --peer $peer `
+  --directory received/inbox --log work/duplex.jsonl --listen-after
+```
+
+在 Mac 接受原生 AirDrop 提示。CLI 分別顯示來源暫存、等待同意、封存傳輸與原生 HTTP 完成，並透過 `/Discover` 取得裝置名稱。目前限單一檔案、最大 1 MiB；目的端實際檔案 SHA256 仍需獨立驗收。失敗或結果不確定的操作不會自動重送。
+
 ## 驗證
 
-**可攜式協定檢查: 277.** **Windows 接收端測試: 12.**
+**可攜式協定檢查: 281.** **Windows 主機測試: 20.**
 
 可攜式測試涵蓋畸形封包、邊界、同步與協定線格式；主機測試檢查偏移、雜湊與可靠落盤的失敗情況。實機證據另行記錄。
 
@@ -115,7 +126,7 @@ ctest --test-dir build -C Release --output-on-failure
 ```
 
 ```powershell
-python -m unittest discover -s tests -p test_receiver.py -q
+python -m unittest discover -s tests -p "test_*.py" -q
 ```
 
 ## 系統架構
@@ -143,6 +154,9 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 
 ## 文件與實測證據
 
+- [原生雙向驗收](docs/native-duplex.md)
+- [序列埠控制協定](docs/serial-protocol.md)
+- [產品驗收標準](docs/product-acceptance.md)
 - [協定參考](docs/protocol-references.md)
 - [AWDL 鄰居接納](docs/awdl-qualification.md)
 - [IPv6 資料往返](docs/ipv6-qualification.md)
@@ -154,7 +168,7 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 
 ## 後續規劃
 
-- [ ] 獨立實作 Windows → Apple 傳送與往返雜湊驗證
+- [x] 獨立實作 Windows → Apple 傳送與同韌體二進位檔往返驗證
 - [ ] 穩定發現、重新連線復原與明確的失敗狀態
 - [ ] 擴充對端選擇、真實名稱與傳輸進度
 - [ ] 以 Tauri 2、React、TypeScript 與 Rust 製作桌面應用程式

@@ -14,7 +14,7 @@ if(AIRBRIDGE_NATIVE_SERVICE)
   execute_process(COMMAND "${PYTHON}" "${CMAKE_CURRENT_LIST_DIR}/../../scripts/generate-identity.py"
     "${CMAKE_CURRENT_BINARY_DIR}/identity_credentials.hpp" COMMAND_ERROR_IS_FATAL ANY)
   target_include_directories(${COMPONENT_LIB} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-  target_sources(${COMPONENT_LIB} PRIVATE "native_receiver.cpp" "ble_presence.cpp" "serial_channel.cpp" "../../core/archive.cpp" "../../core/native_service.cpp")
+  target_sources(${COMPONENT_LIB} PRIVATE "native_receiver.cpp" "native_sender.cpp" "ble_presence.cpp" "serial_channel.cpp" "../../core/archive.cpp" "../../core/native_service.cpp" "../../core/serial_protocol.cpp")
   idf_component_optional_requires(PRIVATE bt esp_driver_usb_serial_jtag)
   target_compile_definitions(${COMPONENT_LIB} PRIVATE AIRBRIDGE_NATIVE_SERVICE=1)
 endif()

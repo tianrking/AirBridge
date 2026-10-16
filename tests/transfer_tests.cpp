@@ -122,6 +122,20 @@ void serial_tests() {
     check(guard.check(data)==Replay::fresh,"higher sequence can execute once");guard.remember(data);
     check(guard.check(command)==Replay::stale,"old commands cannot replay a mutation");
     guard.reset();check(guard.check(command)==Replay::fresh,"explicit session reset permits fresh sequence");
+    LineDecoder decoder;Bytes completed{nullptr,99};unsigned ready=0,overflow=0;
+    for(const auto c:literal) if(decoder.push(std::uint8_t(c),completed)==LineResult::ready) ++ready;
+    check(ready==1 && completed.size==literal.size() && !std::memcmp(completed.data,literal.data(),literal.size()),"driver fragments preserve the entire CRC-protected record");
+    const std::string oversized(500,'x');
+    for(const auto c:oversized) if(decoder.push(std::uint8_t(c),completed)==LineResult::overflow) ++overflow;
+    decoder.push('\n',completed);ready=0;
+    for(const auto c:literal) if(decoder.push(std::uint8_t(c),completed)==LineResult::ready) ++ready;
+    check(overflow==1 && ready==1 && completed.size==literal.size(),"oversized command discards through newline and resynchronizes once");
+    const std::string maximum_line=std::string(223,'x')+'\n';ready=0;
+    for(const auto c:maximum_line) if(decoder.push(std::uint8_t(c),completed)==LineResult::ready) ++ready;
+    check(ready==1 && completed.size==224,"maximum physical record fits without a terminator overflow");
+    decoder.push('x',completed);decoder.reset();ready=0;
+    for(const auto c:literal) if(decoder.push(std::uint8_t(c),completed)==LineResult::ready) ++ready;
+    check(ready==1 && parse_command(completed,command)==Error::none,"explicit decoder reset clears a partial record");
 }
 }
 unsigned transfer_checks() {archive_tests();aggregate_tests();native_tests();serial_tests();return count;}

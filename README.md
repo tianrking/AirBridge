@@ -14,7 +14,7 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-macOS Finder discovered **AirBridge PC** and delivered a 262,145-byte binary with matching source and destination SHA256. Both 6 Mbps and the directed-presence/1 Mbps comparison passed scoped native receive tests.
+macOS Finder discovered **AirBridge PC** and delivered a 262,145-byte binary with matching source and destination SHA256. Both 6 Mbps and the directed-presence/1 Mbps comparison passed scoped native receive tests. The independent sender also delivered a 65,537-byte binary to the Mac and received it back on the same firmware, with all three actual file SHA256 values matching.
 
 | Capability | Status |
 | :--- | :--- |
@@ -23,7 +23,7 @@ macOS Finder discovered **AirBridge PC** and delivered a 262,145-byte binary wit
 | IPv6 over AWDL | Hardware verified |
 | Native device names | Verified through TLS `/Discover` |
 | Mac → Windows files | Text and 262,145-byte binary verified |
-| Windows → Mac files | Not yet implemented |
+| Windows → Mac files | 65,537-byte binary and same-image roundtrip verified |
 | Desktop application | Tauri 2 · React · TypeScript · Rust — planned |
 
 <details>
@@ -98,9 +98,25 @@ Keep the CLI running. Unlock the Mac, enable Everyone in AirDrop, then share a f
 
 Each serial chunk must be acknowledged. Windows checks sizes and SHA256, flushes files and publishes the temporary directory before confirming the transfer. Receipts sit beside completed directories; failed `.partial` output is retained for diagnosis.
 
+### 5. Send from Windows
+
+Stop any separate receiver process first. The sender owns the same serial port
+and services incoming records while waiting for native Apple consent.
+
+```powershell
+python scripts/send-native.py C:\path\to\file.bin --peer $peer `
+  --directory received/inbox --log work/duplex.jsonl --listen-after
+```
+
+Accept the native AirDrop prompt on the Mac. The CLI separates source staging,
+consent, archive transmission and native HTTP completion. It reports the native
+peer name from `/Discover`. Initial sending is bounded to one file up to 1 MiB;
+actual destination SHA256 is a separate acceptance check. A failed or uncertain
+operation is never automatically resent.
+
 ## Verification
 
-**Portable protocol assertions: 277.** **Windows receiver tests: 12.**
+**Portable protocol assertions: 281.** **Windows host tests: 20.**
 
 The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Host tests exercise offset, digest and durable-publication failures. Hardware evidence is recorded separately.
 
@@ -115,7 +131,7 @@ ctest --test-dir build -C Release --output-on-failure
 ```
 
 ```powershell
-python -m unittest discover -s tests -p test_receiver.py -q
+python -m unittest discover -s tests -p "test_*.py" -q
 ```
 
 ## Architecture
@@ -143,6 +159,9 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 
 ## Documentation & evidence
 
+- [Native duplex acceptance](docs/native-duplex.md)
+- [Serial control protocol](docs/serial-protocol.md)
+- [Product acceptance gates](docs/product-acceptance.md)
 - [Protocol references](docs/protocol-references.md)
 - [AWDL neighbor admission](docs/awdl-qualification.md)
 - [IPv6 payload roundtrip](docs/ipv6-qualification.md)
@@ -154,7 +173,7 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 
 ## Roadmap
 
-- [ ] Independent Windows → Apple sending and verified roundtrips
+- [x] Independent Windows → Apple sending and a verified same-image binary roundtrip
 - [ ] Stable discovery, reconnect recovery and clearer failure states
 - [ ] Broader peer selection, real names and transfer progress
 - [ ] Tauri 2 desktop application with React, TypeScript and Rust

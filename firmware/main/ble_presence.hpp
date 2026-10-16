@@ -2,3 +2,5 @@
 #pragma once
 #include "esp_err.h"
 esp_err_t ble_presence_begin();
+// Refresh our own nonconnectable advertisement for an explicit outgoing send.
+esp_err_t ble_presence_refresh();

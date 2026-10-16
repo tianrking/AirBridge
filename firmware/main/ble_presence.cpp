@@ -55,3 +55,21 @@ esp_err_t ble_presence_begin() {
     std::printf("{\"event\":\"ble_presence_ready\",\"code\":%d,\"contact_authenticated\":false}\n",result);
     return result;
 }
+esp_err_t ble_presence_refresh() {
+    if(!completions) return ESP_ERR_INVALID_STATE;
+    const std::uint8_t disabled=0,enabled=1;
+    auto result=command(0x200a,&disabled,1);
+    if(result!=ESP_OK) return result;
+    std::array<std::uint8_t,6> address{};
+    esp_fill_random(address.data(),address.size());address[5]|=0xc0;
+    result=command(0x2005,address.data(),address.size());
+    if(result==ESP_OK) {
+        std::array<std::uint8_t,32> payload{};payload[0]=27;
+        payload[1]=2;payload[2]=1;payload[3]=6;payload[4]=23;payload[5]=0xff;payload[6]=0x4c;
+        payload[8]=5;payload[9]=18;payload[10]=0x40;
+        esp_fill_random(payload.data()+11,3);payload[18]=3;
+        result=command(0x2008,payload.data(),payload.size());
+    }
+    const auto resumed=command(0x200a,&enabled,1);
+    return result==ESP_OK ? resumed : result;
+}

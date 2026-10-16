@@ -2,6 +2,13 @@
 #include "serial_protocol.hpp"
 #include <cstring>
 namespace airbridge::serial {
+LineResult LineDecoder::push(std::uint8_t byte,awdl::Bytes& output) {
+    if(dropping_) {if(byte=='\n') dropping_=false;return LineResult::pending;}
+    if(used_==bytes_.size()) {used_=0;dropping_=byte!='\n';return LineResult::overflow;}
+    bytes_[used_++]=byte;
+    if(byte!='\n') return LineResult::pending;
+    output={bytes_.data(),used_};used_=0;return LineResult::ready;
+}
 std::uint32_t crc32(awdl::Bytes input) {
     std::uint32_t result=0xffffffffu;
     for(std::size_t i=0;i<input.size;i++) {result^=input.data[i];for(unsigned bit=0;bit<8;bit++) result=result&1 ? (result>>1)^0xedb88320u : result>>1;}
