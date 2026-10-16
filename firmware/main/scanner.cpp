@@ -40,8 +40,9 @@ void on_frame(void* buffer,wifi_promiscuous_pkt_type_t type) {
     if(packet->rx_ctrl.rx_state || packet->rx_ctrl.sig_len<44) return;
 #ifdef AIRBRIDGE_IPV6_LINK
     if(type==WIFI_PKT_DATA) {
-        Ipv6Frame parsed{};
-        if(parse_ipv6({packet->payload,std::size_t(packet->rx_ctrl.sig_len)-4},parsed)==Error::none) ipv6_link_receive(parsed);
+        Ipv6Batch parsed{};
+        if(parse_ipv6_batch({packet->payload,std::size_t(packet->rx_ctrl.sig_len)-4},parsed)==Error::none)
+            for(std::size_t i=0;i<parsed.count;i++) ipv6_link_receive(parsed.frames[i]);
         return;
     }
 #endif

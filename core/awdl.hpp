@@ -44,6 +44,9 @@ struct Announcement {
 Error parse_announcement(Bytes frame, Announcement& output);
 struct Ipv6Frame { Mac source{},destination{};std::uint16_t sequence{};Bytes packet{}; };
 Error parse_ipv6(Bytes frame, Ipv6Frame& output);
+struct Ipv6Batch {std::array<Ipv6Frame,16> frames{};std::size_t count{};};
+// Borrowed packet views; validates the entire aggregate before publishing any view.
+Error parse_ipv6_batch(Bytes frame,Ipv6Batch& output);
 std::array<std::uint8_t,16> link_local(const Mac& mac);
 
 // All anchors are local monotonic receive times. Sender clocks are never mixed

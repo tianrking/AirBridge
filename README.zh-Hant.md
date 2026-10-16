@@ -16,7 +16,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 ## 專案狀態
 
-原生 TLS 1.2 `/Discover` 回傳 HTTP 200，並解析出 Apple 裝置的真實顯示名稱，包括 Unicode 字元。檔案收發尚未通過驗收。
+已實作有界 A-MSDU 解碼與 DvZip／CPIO 串流解析。解析器檢查不代表原生檔案傳輸已通過驗收。
 
 | 功能 | 狀態 |
 | :--- | :--- |
@@ -68,7 +68,7 @@ idf.py -C firmware -B work/scanner -p COM4 flash
 
 ## 驗證
 
-**可攜式協定檢查: 166.**
+**可攜式協定檢查: 198.**
 
 可攜式測試涵蓋畸形封包、邊界、同步與協定線格式；實機證據會於取得後另行記錄。
 
@@ -105,6 +105,7 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 - [AWDL 鄰居接納](docs/awdl-qualification.md)
 - [IPv6 資料往返](docs/ipv6-qualification.md)
 - [Discover 原生名稱](docs/discover-qualification.md)
+- [串流封存核心](docs/transfer-core.md)
 
 ## 後續規劃
 

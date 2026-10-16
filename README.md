@@ -16,7 +16,7 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-Native TLS 1.2 `/Discover` returned HTTP 200 and the real Apple device display name, including Unicode. File sending and receiving remain unqualified.
+Bounded A-MSDU decoding and streaming DvZip/CPIO parsing are implemented. These parser checks do not qualify native file delivery.
 
 | Capability | Status |
 | :--- | :--- |
@@ -68,7 +68,7 @@ At this revision, the scanner and protocol probes are development tools. They do
 
 ## Verification
 
-**Portable protocol assertions: 166.**
+**Portable protocol assertions: 198.**
 
 The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Hardware evidence is recorded separately as it becomes available.
 
@@ -105,6 +105,7 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 - [AWDL neighbor admission](docs/awdl-qualification.md)
 - [IPv6 payload roundtrip](docs/ipv6-qualification.md)
 - [Native names through Discover](docs/discover-qualification.md)
+- [Streaming archive core](docs/transfer-core.md)
 
 ## Roadmap
 

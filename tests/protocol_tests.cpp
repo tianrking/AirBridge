@@ -156,4 +156,5 @@ static void identities() {
     wire.assign(ambiguous.begin(),ambiguous.end());
     require(airbridge::discovery::parse_http_response(wire.data(),wire.size(),response)==Error::malformed,"conflicting HTTP framing rejects");
 }
-int main() {parsing();clocks();selection();data();discovery();encoding();identities();std::cout<<checks<<" protocol checks passed\n";}
+unsigned transfer_checks();
+int main() {parsing();clocks();selection();data();discovery();encoding();identities();checks+=transfer_checks();std::cout<<checks<<" protocol checks passed\n";}

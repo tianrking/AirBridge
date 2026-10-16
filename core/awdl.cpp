@@ -136,7 +136,7 @@ Error parse_ipv6(Bytes frame,Ipv6Frame& output) {
     if(!frame.data || frame.size<80) return Error::truncated;
     const auto* p=frame.data;
     if((p[0]&0xfc)!=8 && (p[0]&0xfc)!=0x88) return Error::not_awdl;
-    if(p[1]&0x43) return Error::unsupported;
+    if(p[1]&0xc3) return Error::unsupported;
     const bool qos=(p[0]&0x80)!=0;
     const std::size_t llc=qos ? 26 : 24;
     if(qos && (p[24]&0x80)) return Error::unsupported; // A-MSDU requires a separate bounded decoder.
@@ -151,6 +151,41 @@ Error parse_ipv6(Bytes frame,Ipv6Frame& output) {
 
 std::array<std::uint8_t,16> link_local(const Mac& address) {
     return {0xfe,0x80,0,0,0,0,0,0,std::uint8_t(address[0]^2),address[1],address[2],0xff,0xfe,address[3],address[4],address[5]};
+}
+
+Error parse_ipv6_batch(Bytes frame,Ipv6Batch& output) {
+    if(!frame.data || frame.size<26) return Error::truncated;
+    const auto* p=frame.data;
+    if((p[0]&0xfc)!=0x88 || !(p[24]&0x80)) {
+        Ipv6Batch draft{};
+        const auto status=parse_ipv6(frame,draft.frames[0]);
+        if(status!=Error::none) return status;
+        draft.count=1;output=draft;return Error::none;
+    }
+    if(p[1]&0xc3) return Error::unsupported;
+    Ipv6Batch draft{};std::size_t cursor=26;
+    constexpr std::uint8_t prefix[]{0xaa,0xaa,3,0,0x17,0xf2,8,0,3,4};
+    while(cursor<frame.size) {
+        if(frame.size-cursor<14) return Error::truncated;
+        const auto* sub=p+cursor;
+        const std::size_t size=be16(sub+12);
+        if(size>frame.size-cursor-14) return Error::truncated;
+        if(size<56 || size>1296) return Error::malformed;
+        const auto* payload=sub+14;
+        if(std::memcmp(payload,prefix,sizeof(prefix))) return Error::not_awdl;
+        if(payload[12] || payload[13] || be16(payload+14)!=0x86dd || (payload[16]>>4)!=6 ||
+           40u+be16(payload+20)!=size-16) return Error::malformed;
+        if(draft.count==draft.frames.size()) return Error::unsupported;
+        draft.frames[draft.count++]={mac(sub+6),mac(sub),le16(payload+10),{payload+16,size-16}};
+        cursor+=14+size;
+        if(cursor==frame.size) break;
+        const std::size_t pad=(4-((14+size)%4))%4;
+        if(pad>frame.size-cursor) return Error::truncated;
+        cursor+=pad;
+        if(cursor==frame.size) return Error::malformed; // Padding must precede another subframe.
+    }
+    if(!draft.count) return Error::malformed;
+    output=draft;return Error::none;
 }
 
 bool Clock::observe(const Sync& sync,std::uint64_t received_us) {

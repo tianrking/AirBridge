@@ -16,7 +16,7 @@ AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows medi
 
 ## Estado del proyecto
 
-La solicitud nativa TLS 1.2 `/Discover` devolvió HTTP 200 y el nombre real del dispositivo Apple, incluidos caracteres Unicode. El envío y la recepción de archivos siguen sin validarse.
+Están implementados la decodificación acotada de A-MSDU y el análisis en flujo de DvZip/CPIO. Estas pruebas del analizador no validan la entrega nativa de archivos.
 
 | Función | Estado |
 | :--- | :--- |
@@ -68,7 +68,7 @@ En esta revisión, el escáner y las sondas del protocolo son herramientas de de
 
 ## Verificación
 
-**Comprobaciones del protocolo portátil: 166.**
+**Comprobaciones del protocolo portátil: 198.**
 
 Las pruebas portátiles cubren tramas malformadas, límites, sincronización y datos del protocolo. Las evidencias de hardware se registran por separado cuando están disponibles.
 
@@ -105,6 +105,7 @@ La MAC AWDL, la instancia DNS, la etiqueta del host y el nombre de AirDrop son i
 - [Aceptación de vecinos AWDL](docs/awdl-qualification.md)
 - [Intercambio de datos IPv6](docs/ipv6-qualification.md)
 - [Nombres nativos mediante Discover](docs/discover-qualification.md)
+- [Núcleo de archivos en flujo](docs/transfer-core.md)
 
 ## Próximos pasos
 
