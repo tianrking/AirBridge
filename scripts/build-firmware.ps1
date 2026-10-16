@@ -1,4 +1,4 @@
-param([string]$BuildDirectory='work/s', [switch]$PresenceTx, [switch]$Ipv6Link, [switch]$NativeService, [switch]$FullCalibration,
+param([string]$BuildDirectory='work/s', [switch]$PresenceTx, [switch]$Ipv6Link, [switch]$NativeService, [switch]$FullCalibration, [switch]$LegacyRate1M,
     [ValidatePattern('^(?:[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})?$')][string]$ProbePeer='')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
@@ -15,5 +15,5 @@ $env:ESP_IDF_VERSION='6.1'
 $buildPath=if ([IO.Path]::IsPathRooted($BuildDirectory)) {$BuildDirectory} else {Join-Path $projectRoot $BuildDirectory}
 & $idfPython (Join-Path $PSScriptRoot 'set-calibration-profile.py') (Join-Path $projectRoot 'firmware\sdkconfig') $(if($FullCalibration){'full'}else{'partial'})
 if ($LASTEXITCODE -ne 0) { throw 'SDK calibration profile update failed.' }
-& $idfPython (Join-Path $env:IDF_PATH 'tools\idf.py') -C (Join-Path $projectRoot 'firmware') -B $buildPath -D "AIRBRIDGE_PRESENCE_TX=$($PresenceTx.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_IPV6_LINK=$($Ipv6Link.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_NATIVE_SERVICE=$($NativeService.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_PROBE_PEER=$ProbePeer" build
+& $idfPython (Join-Path $env:IDF_PATH 'tools\idf.py') -C (Join-Path $projectRoot 'firmware') -B $buildPath -D "AIRBRIDGE_PRESENCE_TX=$($PresenceTx.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_IPV6_LINK=$($Ipv6Link.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_NATIVE_SERVICE=$($NativeService.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_RAW_RATE_1M=$($LegacyRate1M.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_PROBE_PEER=$ProbePeer" build
 if ($LASTEXITCODE -ne 0) { throw 'ESP-IDF build failed.' }

@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-16",
+  "transport": "native macOS Finder AirDrop -> ESP32-S3 -> Windows USB Serial/JTAG",
+  "sdk": "ESP-IDF 6.1",
+  "file": "AirBridge-native-receive-262145.bin",
+  "bytes": 262145,
+  "source_sha256": "eb3ddcc7caeb6bef3d10eacdfc07ce0a89997ae4741711c528cce1402d65596c",
+  "windows_file_sha256": "eb3ddcc7caeb6bef3d10eacdfc07ce0a89997ae4741711c528cce1402d65596c",
+  "runs": [
+    {
+      "raw_rate_mbps": 6,
+      "firmware_sha256": "ac3db69e668ca0e363c705f2b7826cf7eac55732f76509f88d28f1d96e3f6b41",
+      "host_committed": true,
+      "response_written": true,
+      "note": "Native binary receiving passed; later idle route loss observed."
+    },
+    {
+      "raw_rate_mbps": 1,
+      "directed_presence": true,
+      "firmware_sha256": "b227eb669fa05034d00ad933e1d039704dabc4a93185fe99e134a8a24cd90010",
+      "host_committed": true,
+      "response_written": true,
+      "note": "Native binary receiving passed about five minutes after boot."
+    }
+  ],
+  "sending_qualified": false,
+  "long_term_visibility_qualified": false,
+  "iphone_qualified": false
+}

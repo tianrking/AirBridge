@@ -111,8 +111,14 @@ extern "C" void app_main() {
     // A boot-local unicast identity avoids stale Apple neighbor/service entries
     // surviving a replaced development image. USB hardware identity is separate.
     Mac identity{};esp_fill_random(identity.data(),identity.size());identity[0]=(identity[0]&0xfc)|2;
+#ifdef AIRBRIDGE_RAW_RATE_1M
+    constexpr auto raw_rate=WIFI_PHY_RATE_1M_L;
+#else
+    constexpr auto raw_rate=WIFI_PHY_RATE_6M;
+#endif
     if(!check(esp_wifi_set_mac(WIFI_IF_STA,identity.data()),"radio_identity") ||
-       !check(esp_wifi_config_80211_tx_rate(WIFI_IF_STA,WIFI_PHY_RATE_6M),"raw_rate")) return;
+       !check(esp_wifi_config_80211_tx_rate(WIFI_IF_STA,raw_rate),"raw_rate")) return;
+    std::printf("{\"event\":\"raw_rate\",\"sdk_rate\":%d}\n",int(raw_rate));
     airbridge_set_tx_identity(identity.data());
 #endif
     if(!check(esp_wifi_start(),"wifi_start") ||
@@ -152,7 +158,7 @@ extern "C" void app_main() {
     presence.advertised.channel.fill(6);presence.advertised.slot_aw_count=4;
     presence.self_metric=presence.root_metric=32;presence.self_counter=presence.root_counter=1;
     presence.clock.observe({own,64,0,16,4},std::uint64_t(esp_timer_get_time()));
-    std::int64_t next_presence=0;std::uint16_t sequence=0;unsigned presence_ok=0,presence_failed=0;
+    std::int64_t next_presence=0,next_direct_presence=0;std::uint16_t sequence=0;unsigned presence_ok=0,presence_failed=0;
 #endif
     for(;;) {
         if(xQueueReceive(observations,&observation,pdMS_TO_TICKS(5))==pdTRUE && observation.announcement.source!=own)
@@ -203,6 +209,26 @@ extern "C" void app_main() {
                 if(sent==ESP_OK) ++presence_ok;else ++presence_failed;
             }
         }
+#ifdef AIRBRIDGE_DISCOVER_PROBE
+        // A directed announcement pair can use the peer's actual channel-6
+        // window and Wi-Fi acknowledgement/retries. Broadcast-only presence
+        // must not be assumed to keep Apple's unicast neighbor state alive.
+        if(now>=next_direct_presence) for(const auto& peer:peers.rows()) {
+            if(!peer.used || peer.announcement.source!=probe_target || !peer.announcement.has_sync ||
+               !peer.announcement.has_channels || std::uint64_t(now)<peer.sync_received_us ||
+               std::uint64_t(now)-peer.sync_received_us>3'000'000) continue;
+            Clock peer_clock;
+            if(!peer_clock.observe(peer.announcement.sync,peer.sync_received_us) ||
+               peer.announcement.channels.channel[peer_clock.slot(std::uint64_t(now))]!=6) break;
+            presence.destination=probe_target;next_direct_presence=now+500'000;
+            for(const auto kind: {0,3}) {
+                const auto encoded=encode_presence(presence,std::uint8_t(kind),sequence++,std::uint64_t(now),frame);
+                const auto sent=encoded==Error::none ? esp_wifi_80211_tx(WIFI_IF_STA,frame.bytes.data(),int(frame.length),true) : ESP_ERR_INVALID_ARG;
+                if(sent==ESP_OK) ++presence_ok;else ++presence_failed;
+            }
+            presence.destination.fill(255);break;
+        }
+#endif
 #endif
         if(now<next) continue;
         next=now+1'000'000;

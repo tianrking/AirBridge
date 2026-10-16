@@ -1,6 +1,10 @@
 idf_component_register(SRCS "scanner.cpp" "../../core/awdl.cpp" "../../core/discovery.cpp" "../../core/presence.cpp"
   INCLUDE_DIRS "../../core" REQUIRES esp_wifi esp_event esp_netif nvs_flash esp_timer lwip mbedtls)
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)
+option(AIRBRIDGE_RAW_RATE_1M "Experimental 2.4 GHz legacy rate comparison" OFF)
+if(AIRBRIDGE_RAW_RATE_1M)
+  target_compile_definitions(${COMPONENT_LIB} PRIVATE AIRBRIDGE_RAW_RATE_1M=1)
+endif()
 option(AIRBRIDGE_SCAN_CAPTURE "Include one rejected raw frame in diagnostic output" OFF)
 option(AIRBRIDGE_NATIVE_SERVICE "Native receiving qualification, restricted to explicit ProbePeer" OFF)
 if(AIRBRIDGE_NATIVE_SERVICE)

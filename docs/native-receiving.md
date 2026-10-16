@@ -69,6 +69,11 @@ maximum-size transfer or sending. Each boot now generates a unicast AWDL
 identity: read `radio_identity` and derive the current IPv6 address rather than
 using an old MAC. The independent implementation does not yet send files.
 
+The subsequent directed-announcement/1 Mbps comparison also passed the same
+binary receive after about five minutes of runtime. See
+[discovery stability comparisons](discovery-stability.md) for the exact image,
+profile and limits; it does not establish lifetime visibility.
+
 ## Reproduce on the authorized development board
 
 Install `scripts/requirements.txt` into the selected Python environment. Build
@@ -92,6 +97,10 @@ are different transports; current receiving evidence covers native USB only.
 `-FullCalibration` selects the SDK's complete RF calibration for a controlled
 comparison without erasing NVS. It has not been established as a connectivity
 fix. A normal build selects partial calibration again.
+
+To reproduce the later accepted comparison, append `-FullCalibration -LegacyRate1M`
+to the build command. The default remains 6 Mbps. Rate comparisons can change
+throughput and are not an assertion that measured RSSI improved.
 
 Select a file in Finder, share through AirDrop to AirBridge PC, and compare the
 Mac source SHA256 with both the Windows receipt and the actual received file.

@@ -16,7 +16,7 @@ AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows medi
 
 ## Estado del proyecto
 
-La recepción nativa de un binario superó la verificación SHA256. El receptor de Windows ahora conserva registros serie fragmentados y permite ejecución continua. La detección prolongada y el envío independiente siguen pendientes.
+Finder de macOS encontró **AirBridge PC** y entregó un binario de 262.145 bytes con SHA256 coincidente en origen y destino. Tanto el perfil de 6 Mbps como la comparación de anuncios dirigidos a 1 Mbps superaron pruebas acotadas de recepción nativa.
 
 | Función | Estado |
 | :--- | :--- |
@@ -76,8 +76,11 @@ idf.py -C firmware -B work/native `
   -D AIRBRIDGE_PRESENCE_TX=ON `
   -D AIRBRIDGE_IPV6_LINK=ON `
   -D AIRBRIDGE_NATIVE_SERVICE=ON `
+  -D AIRBRIDGE_RAW_RATE_1M=ON `
   -D "AIRBRIDGE_PROBE_PEER=$peer" build
 ```
+
+El comando selecciona la velocidad de comparación de 1 Mbps. La prueba registrada también utilizó calibración RF completa; no se ha demostrado que la calibración por sí sola resuelva la detección. El script local `scripts/build-firmware.ps1` admite `-FullCalibration -LegacyRate1M`, pero presupone la distribución del SDK indicada en el propio script.
 
 ### 3. Grabar la placa verificada
 
@@ -142,6 +145,8 @@ La MAC AWDL, la instancia DNS, la etiqueta del host y el nombre de AirDrop son i
 - [Nombres nativos mediante Discover](docs/discover-qualification.md)
 - [Núcleo de archivos en flujo](docs/transfer-core.md)
 - [Recepción nativa y hashes](docs/native-receiving.md)
+- [Comparaciones de estabilidad de detección](docs/discovery-stability.md)
+- [Recibo de recepción legible por máquinas](docs/native-receive-2026-10-16.json)
 
 ## Próximos pasos
 

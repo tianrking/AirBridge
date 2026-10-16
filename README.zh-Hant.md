@@ -16,7 +16,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 ## 專案狀態
 
-原生二進位檔接收已通過 SHA256 驗證。Windows 接收端新增分段序列資料保留與常駐執行功能；長時間可發現性與獨立傳送仍待完成。
+macOS Finder 已找到 **AirBridge PC**，並成功傳送 262,145 位元組二進位檔，來源與接收端 SHA256 一致。6 Mbps 與定向公告／1 Mbps 對照設定均通過限定範圍的原生接收驗證。
 
 | 功能 | 狀態 |
 | :--- | :--- |
@@ -76,8 +76,11 @@ idf.py -C firmware -B work/native `
   -D AIRBRIDGE_PRESENCE_TX=ON `
   -D AIRBRIDGE_IPV6_LINK=ON `
   -D AIRBRIDGE_NATIVE_SERVICE=ON `
+  -D AIRBRIDGE_RAW_RATE_1M=ON `
   -D "AIRBRIDGE_PROBE_PEER=$peer" build
 ```
+
+此命令選用 1 Mbps 對照速率。已記錄的驗收也使用完整 RF 校準，但單獨校準尚未證實可修復發現問題。本機 `scripts/build-firmware.ps1` 支援 `-FullCalibration -LegacyRate1M`，其 SDK 路徑假設請參閱腳本。
 
 ### 3. 燒錄已核對的開發板
 
@@ -142,6 +145,8 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 - [Discover 原生名稱](docs/discover-qualification.md)
 - [串流封存核心](docs/transfer-core.md)
 - [原生接收與檔案雜湊](docs/native-receiving.md)
+- [發現穩定性對照](docs/discovery-stability.md)
+- [機器可讀的接收紀錄](docs/native-receive-2026-10-16.json)
 
 ## 後續規劃
 

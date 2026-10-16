@@ -16,7 +16,7 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-Native binary receiving passed SHA256 verification. The Windows receiver now preserves fragmented serial records and supports resident operation. Long-term discoverability and independent sending remain open.
+macOS Finder discovered **AirBridge PC** and delivered a 262,145-byte binary with matching source and destination SHA256. Both 6 Mbps and the directed-presence/1 Mbps comparison passed scoped native receive tests.
 
 | Capability | Status |
 | :--- | :--- |
@@ -76,8 +76,11 @@ idf.py -C firmware -B work/native `
   -D AIRBRIDGE_PRESENCE_TX=ON `
   -D AIRBRIDGE_IPV6_LINK=ON `
   -D AIRBRIDGE_NATIVE_SERVICE=ON `
+  -D AIRBRIDGE_RAW_RATE_1M=ON `
   -D "AIRBRIDGE_PROBE_PEER=$peer" build
 ```
+
+The command selects the 1 Mbps comparison rate. Full RF calibration was also used in its recorded acceptance run; calibration alone has not been established as a discovery fix. The local `scripts/build-firmware.ps1` helper supports `-FullCalibration -LegacyRate1M`, but assumes the SDK layout documented in that script.
 
 ### 3. Flash the verified board
 
@@ -142,6 +145,8 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 - [Native names through Discover](docs/discover-qualification.md)
 - [Streaming archive core](docs/transfer-core.md)
 - [Native receiving and file hashes](docs/native-receiving.md)
+- [Discovery stability comparisons](docs/discovery-stability.md)
+- [Machine-readable receive receipt](docs/native-receive-2026-10-16.json)
 
 ## Roadmap
 
