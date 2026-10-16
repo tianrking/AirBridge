@@ -1,0 +1,14 @@
+build/
+work/
+firmware/sdkconfig
+firmware/sdkconfig.old
+firmware/build/
+node_modules/
+target/
+dist/
+*.log
+*.pcap
+*.pcapng
+*.partial
+.env*
+received/
