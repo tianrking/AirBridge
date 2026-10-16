@@ -14,6 +14,10 @@ dist/
 received/
 __pycache__/
 *.pyc
+*.tsbuildinfo
+desktop/src-tauri/gen/
+desktop/src-tauri/icons/android/
+desktop/src-tauri/icons/ios/
 identity_credentials.hpp
 *.pem
 *.key

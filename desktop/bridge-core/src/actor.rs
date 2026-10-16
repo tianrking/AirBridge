@@ -19,6 +19,10 @@ enum Command {
         port: u16,
     },
     Status,
+    Resolve {
+        peer: String,
+        port: u16,
+    },
 }
 pub struct Actor {
     tx: SyncSender<Command>,
@@ -50,6 +54,10 @@ impl Actor {
                                 worker_busy.store(false,Ordering::Release);
                             }
                             Command::Status=>{let reply=client.request("STATUS")?;(events)(json!({"event":"device_status","status":reply}));}
+                            Command::Resolve{peer,port}=>{
+                                if let Err(error)=client.resolve(&peer,port) {(events)(json!({"event":"resolution_error","mac":peer,"message":format!("{error:#}")}));}
+                                worker_busy.store(false,Ordering::Release);
+                            }
                         }
                     }
                     client.poll()?;
@@ -84,6 +92,19 @@ impl Actor {
         self.tx
             .try_send(Command::Status)
             .context("Serial actor is busy or disconnected")
+    }
+    pub fn resolve(&self, peer: String, port: u16) -> Result<()> {
+        ensure!(
+            self.busy
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok(),
+            "A bridge operation is already active"
+        );
+        if let Err(error) = self.tx.try_send(Command::Resolve { peer, port }) {
+            self.busy.store(false, Ordering::Release);
+            return Err(error).context("Serial actor is busy or disconnected");
+        }
+        Ok(())
     }
     pub fn cancel(&self) {
         self.cancel.store(true, Ordering::Relaxed);

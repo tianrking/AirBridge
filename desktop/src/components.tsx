@@ -1,0 +1,230 @@
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  File,
+  FolderOpen,
+  Laptop,
+  LoaderCircle,
+  Smartphone,
+  X,
+} from "lucide-react";
+import { useEffect, useRef } from "react";
+import type { Copy } from "./i18n";
+import { formatBytes, terminal, type Peer, type Transfer } from "./types";
+export function PeerCard({
+  peer,
+  selected,
+  onSelect,
+  copy,
+}: {
+  peer: Peer;
+  selected: boolean;
+  onSelect: () => void;
+  copy: Copy;
+}) {
+  const deviceName = peer.name ?? copy.appleDevice;
+  const Icon = peer.name?.toLowerCase().includes("mac") ? Laptop : Smartphone;
+  return (
+    <button
+      className={`peer-card ${selected ? "selected" : ""}`}
+      onClick={onSelect}
+      disabled={!peer.advertised || !peer.port}
+      aria-pressed={selected}
+      aria-label={`${copy.selectDevice}: ${deviceName}`}
+      title={`${copy.deviceDetails}: ${peer.mac} · ${peer.rssi} dBm`}
+    >
+      <span className="peer-icon">
+        <Icon size={30} strokeWidth={1.5} />
+      </span>
+      <span className="peer-name">{deviceName}</span>
+      <span className="peer-subtitle">
+        {peer.name ? copy.nativeName : copy.resolving}
+      </span>
+      <span className="peer-foot">
+        <i className="dot green" />
+        {peer.advertised ? copy.advertised : copy.scanning}
+      </span>
+      {selected ? (
+        <span className="peer-selected">
+          <Check size={13} />
+        </span>
+      ) : null}
+    </button>
+  );
+}
+export function TransferRow({
+  transfer,
+  copy,
+  onDetails,
+}: {
+  transfer: Transfer;
+  copy: Copy;
+  onDetails: () => void;
+}) {
+  const completed = transfer.state === "completed";
+  const state = completed
+    ? transfer.direction === "send"
+      ? copy.sent
+      : copy.received
+    : (copy[transfer.state as keyof Copy] ?? transfer.state);
+  const progress =
+    transfer.progress_total > 0
+      ? Math.min(100, (transfer.done / transfer.progress_total) * 100)
+      : 0;
+  return (
+    <button
+      className="transfer-row"
+      onClick={onDetails}
+      aria-label={`${copy.details}: ${transfer.name}`}
+    >
+      <span className="file-icon">
+        <File size={22} strokeWidth={1.5} />
+      </span>
+      <span className="transfer-content">
+        <strong>{transfer.name}</strong>
+        <span className="transfer-meta">
+          {transfer.direction === "send" ? (
+            <ArrowUpRight size={13} />
+          ) : (
+            <ArrowDownLeft size={13} />
+          )}
+          {formatBytes(transfer.bytes)}
+          <span>·</span>
+          {state}
+        </span>
+        {!terminal(transfer.state) ? (
+          <span
+            role="progressbar"
+            aria-label={state}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={transfer.progress_total ? progress : undefined}
+            className={`progress ${transfer.progress_total === 0 ? "indeterminate" : ""}`}
+          >
+            <span style={{ width: `${progress}%` }} />
+          </span>
+        ) : null}
+      </span>
+      {completed ? (
+        <CheckCircle2 size={18} className="success-icon" />
+      ) : !terminal(transfer.state) ? (
+        <LoaderCircle size={17} className="spin muted" />
+      ) : (
+        <span className="status-dot" />
+      )}
+      <ChevronRight size={16} className="muted" />
+    </button>
+  );
+}
+export function TransferDetails({
+  transfer,
+  copy,
+  onClose,
+  onFolder,
+  onCancel,
+}: {
+  transfer: Transfer;
+  copy: Copy;
+  onClose: () => void;
+  onFolder: () => void;
+  onCancel: () => void;
+}) {
+  const dialog = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    dialog.current?.querySelector("button")?.focus();
+    return () => {
+      if (previous instanceof HTMLElement) previous.focus();
+    };
+  }, []);
+  const state =
+    transfer.state === "completed"
+      ? transfer.direction === "send"
+        ? copy.sent
+        : copy.received
+      : (copy[transfer.state as keyof Copy] ?? transfer.state);
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <section
+        ref={dialog}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="transfer-title"
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const items = dialog.current?.querySelectorAll<HTMLButtonElement>(
+            "button:not(:disabled)",
+          );
+          if (!items?.length) return;
+          const first = items[0];
+          const last = items[items.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
+      >
+        <button
+          className="icon-button modal-close"
+          onClick={onClose}
+          aria-label={copy.close}
+        >
+          <X size={20} />
+        </button>
+        <span className="large-file">
+          <File size={34} strokeWidth={1.3} />
+        </span>
+        <p className="eyebrow">{copy.details}</p>
+        <h2 id="transfer-title">{transfer.name}</h2>
+        <p className="muted">
+          {formatBytes(transfer.bytes)} · {state}
+        </p>
+        {transfer.state === "completed" ? (
+          <div className="confirmation">
+            <CheckCircle2 size={18} />
+            {transfer.direction === "send"
+              ? copy.nativeConfirmed
+              : copy.hashChecked}
+          </div>
+        ) : null}
+        {transfer.sha256 ? (
+          <div className="hash-block">
+            <label>
+              {transfer.direction === "send"
+                ? copy.sourceHash
+                : copy.receivedHash}
+            </label>
+            <code>{transfer.sha256}</code>
+            <p>
+              {transfer.direction === "send"
+                ? copy.outcomeHint
+                : copy.incomingHint}
+            </p>
+          </div>
+        ) : null}
+        {transfer.error ? (
+          <p className="detail-error">{transfer.error}</p>
+        ) : null}
+        {transfer.directory ? (
+          <button className="primary" onClick={onFolder}>
+            <FolderOpen size={17} />
+            {copy.openFolder}
+          </button>
+        ) : null}
+        {transfer.direction === "send" && !terminal(transfer.state) ? (
+          <button className="secondary" onClick={onCancel}>
+            {copy.cancel}
+          </button>
+        ) : null}
+      </section>
+    </div>
+  );
+}

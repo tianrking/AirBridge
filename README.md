@@ -10,7 +10,7 @@
 
 </div>
 
-AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows over serial. A portable C++17 core implements AWDL framing, synchronization and protocol parsing; ESP-IDF 6.1 provides the radio backend. A Tauri 2 desktop application is planned.
+AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows over serial. A portable C++17 core implements AWDL framing, synchronization and protocol parsing; ESP-IDF 6.1 provides the radio backend. The Tauri 2 desktop application uses React, TypeScript and a single Rust serial actor.
 
 ## Project status
 
@@ -24,7 +24,8 @@ macOS Finder discovered **AirBridge PC** and delivered a 262,145-byte binary wit
 | Native device names | Verified through TLS `/Discover` |
 | Mac → Windows files | Text and 262,145-byte binary verified |
 | Windows → Mac files | 65,537-byte binary and same-image roundtrip verified |
-| Desktop application | Tauri 2 · React · TypeScript · Rust — planned |
+| Rust transfer backend | Native 4,097-byte binary roundtrip verified without Python |
+| Desktop application | Development build; real connection and native names verified; desktop file qualification in progress |
 
 <details>
 <summary>Verified binary fingerprint</summary>
@@ -38,6 +39,12 @@ eb3ddcc7caeb6bef3d10eacdfc07ce0a89997ae4741711c528cce1402d65596c
 </details>
 
 > Development status: long-term visibility, repeated reconnects, larger transfers, iPhone interoperability, contact-only authentication and folder transfer remain unqualified. A discovered MAC or a successful TX callback does not prove file delivery.
+
+## Desktop application
+
+The desktop includes device selection, native file and folder dialogs, outgoing and incoming progress, cancellation, checked receive locations and transfer details. English is the default; Traditional Chinese and Spanish are available in Settings. Names come from native `/Discover`, with an explicit fallback when unresolved.
+
+[Desktop build and usage](desktop/README.md) · [Measured desktop status](docs/desktop-qualification.md)
 
 ## Hardware & prerequisites
 
@@ -140,7 +147,7 @@ python -m unittest discover -s tests -p "test_*.py" -q
 flowchart LR
   Apple["Apple device"] <-->|"AWDL · IPv6 · TLS"| ESP["ESP32-S3 / ESP-IDF 6.1"]
   ESP <-->|"Serial"| PC["Windows host"]
-  PC -.-> UI["Tauri 2 desktop · planned"]
+  PC <--> UI["Tauri 2 · React · TypeScript · Rust"]
 ```
 
 AWDL carries IPv6; mDNS locates the AirDrop service, and TLS carries discovery and transfer requests. Bluetooth provides a nonconnectable wake advertisement. The Windows Wi-Fi adapter does not need AWDL injection support.
@@ -176,7 +183,8 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 - [x] Independent Windows → Apple sending and a verified same-image binary roundtrip
 - [ ] Stable discovery, reconnect recovery and clearer failure states
 - [ ] Broader peer selection, real names and transfer progress
-- [ ] Tauri 2 desktop application with React, TypeScript and Rust
+- [x] Tauri 2 desktop development build with React, TypeScript and Rust
+- [ ] Packaged desktop native duplex and sustained discovery qualification
 - [ ] Expanded device, file-size and transport qualification
 
 ## Acknowledgments

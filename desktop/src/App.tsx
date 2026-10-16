@@ -1,0 +1,508 @@
+import { useEffect, useState } from "react";
+import {
+  Activity,
+  ArrowDownToLine,
+  ArrowUpRight,
+  Cable,
+  ChevronRight,
+  CircleHelp,
+  File,
+  FolderOpen,
+  Globe2,
+  Laptop,
+  LoaderCircle,
+  Radio,
+  Send,
+  Settings2,
+  ShieldCheck,
+  Upload,
+  X,
+} from "lucide-react";
+import { PeerCard, TransferDetails, TransferRow } from "./components";
+import { readLanguage, translations } from "./i18n";
+import {
+  formatBytes,
+  terminal,
+  type Language,
+  type Page,
+  type SelectedFile,
+} from "./types";
+import { useBridge } from "./useBridge";
+import brand from "./brand.svg";
+export default function App() {
+  const bridge = useBridge();
+  const { snapshot } = bridge;
+  const [language, setLanguage] = useState<Language>(readLanguage);
+  const [page, setPage] = useState<Page>("share");
+  const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const copy = translations[language];
+  const connected = snapshot.connection === "connected";
+  const peers = snapshot.peers.filter((peer) => peer.advertised);
+  const target = peers.find((peer) => peer.mac === selectedPeer);
+  const outgoing = snapshot.transfers.find(
+    (transfer) => transfer.direction === "send" && !terminal(transfer.state),
+  );
+  const detail = snapshot.transfers.find(
+    (transfer) => transfer.id === detailId,
+  );
+  const error = bridge.error;
+  useEffect(() => {
+    document.documentElement.lang = language;
+    try {
+      localStorage.setItem("airbridge.language.v1", language);
+    } catch {
+      /* Preference storage is optional. */
+    }
+  }, [language]);
+  useEffect(() => {
+    if (!detail) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDetailId(null);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [detail]);
+  async function chooseFile() {
+    const file = await bridge.call<SelectedFile | null>("choose_file");
+    if (file) setSelectedFile(file);
+  }
+  async function sendFile() {
+    if (!target || !selectedFile) return;
+    const result = await bridge.call<null>("send_file", {
+      fileId: selectedFile.id,
+      peer: target.mac,
+    });
+    if (result !== undefined) setSelectedFile(null);
+  }
+  const title =
+    page === "share"
+      ? copy.title
+      : page === "activity"
+        ? copy.history
+        : copy.preferences;
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <img src={brand} alt="" />
+          <span>AirBridge</span>
+        </div>
+        <nav aria-label="Main navigation">
+          {(
+            [
+              { id: "share", label: copy.share, Icon: Send },
+              { id: "activity", label: copy.activity, Icon: Activity },
+              { id: "settings", label: copy.settings, Icon: Settings2 },
+            ] as const
+          ).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              className={`nav-item ${page === id ? "active" : ""}`}
+              aria-current={page === id ? "page" : undefined}
+              onClick={() => setPage(id)}
+            >
+              <Icon size={18} strokeWidth={1.7} />
+              {label}
+              {id === "activity" && snapshot.transfers.length ? (
+                <span className="count">{snapshot.transfers.length}</span>
+              ) : null}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="mini-bridge">
+            <Cable size={18} />
+            <div>
+              <strong>ESP32-S3</strong>
+              <span>
+                <i className={`dot ${connected ? "green" : "gray"}`} />
+                {connected ? copy.connected : copy.disconnected}
+              </span>
+            </div>
+          </div>
+          <p>{copy.subtitle}</p>
+          <span className="version">AirBridge 0.4.0</span>
+        </div>
+      </aside>
+      <main className="main">
+        <header className="topbar">
+          <span>{copy[page]}</span>
+          <div className="topbar-status">
+            <i className={`dot ${connected ? "green" : "gray"}`} />
+            {connected ? copy.ready : copy.disconnected}
+          </div>
+        </header>
+        <div className="page-content">
+          <div className="page-heading">
+            <div>
+              <p className="eyebrow">
+                AIRBRIDGE /{" "}
+                {page === "share" ? "01" : page === "activity" ? "02" : "03"}
+              </p>
+              <h1>{title}</h1>
+              <p>
+                {page === "share"
+                  ? copy.description
+                  : page === "activity"
+                    ? copy.historyHelp
+                    : copy.preferencesHelp}
+              </p>
+            </div>
+            {page === "share" ? (
+              <span className="heading-icon">
+                <Radio size={28} strokeWidth={1.2} />
+              </span>
+            ) : null}
+          </div>
+          {error ? (
+            <div className="error-banner" role="alert">
+              <div>
+                <strong>{copy.error}</strong>
+                <p>{error}</p>
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => {
+                  bridge.clearError();
+                }}
+                aria-label={copy.dismiss}
+              >
+                <X size={17} />
+              </button>
+            </div>
+          ) : null}
+          {!bridge.native ? (
+            <div className="preview-note">
+              <CircleHelp size={16} />
+              {copy.noDesktop}
+            </div>
+          ) : null}
+          {page === "share" ? (
+            <>
+              <section className="bridge-strip">
+                <span className={`bridge-glyph ${connected ? "online" : ""}`}>
+                  <Cable size={23} strokeWidth={1.6} />
+                </span>
+                <div>
+                  <strong>
+                    {copy.bridge}
+                    <span className="chip">ESP32-S3</span>
+                  </strong>
+                  <p>{connected ? copy.ready : copy.connectionHelp}</p>
+                </div>
+                <button
+                  className={
+                    connected ? "secondary compact" : "primary compact"
+                  }
+                  disabled={
+                    bridge.pending ||
+                    snapshot.connection === "connecting" ||
+                    Boolean(outgoing)
+                  }
+                  onClick={() =>
+                    void bridge.call(
+                      connected ? "disconnect_bridge" : "connect_bridge",
+                    )
+                  }
+                >
+                  {snapshot.connection === "connecting" ? (
+                    <LoaderCircle size={15} className="spin" />
+                  ) : null}
+                  {connected
+                    ? copy.disconnect
+                    : snapshot.connection === "connecting"
+                      ? copy.connecting
+                      : copy.connect}
+                </button>
+              </section>
+              <section className="devices-section">
+                <div className="section-heading">
+                  <h2>
+                    {copy.nearby}
+                    <span className="subtle-count">
+                      {peers.length.toString().padStart(2, "0")}
+                    </span>
+                  </h2>
+                  <span className="listening">
+                    <i className={`dot ${connected ? "blue pulse" : "gray"}`} />
+                    {connected ? copy.scanning : copy.selectDevice}
+                  </span>
+                </div>
+                {peers.length ? (
+                  <div className="peer-grid">
+                    {peers.map((peer) => (
+                      <PeerCard
+                        key={peer.mac}
+                        peer={peer}
+                        selected={selectedPeer === peer.mac}
+                        copy={copy}
+                        onSelect={() => {
+                          setSelectedPeer(peer.mac);
+                          if (
+                            !peer.name &&
+                            snapshot.can_resolve &&
+                            !snapshot.resolving_peer &&
+                            !outgoing
+                          )
+                            void bridge.call("resolve_peer", {
+                              peer: peer.mac,
+                            });
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-devices">
+                    <span className="radar">
+                      <Radio size={28} strokeWidth={1.2} />
+                    </span>
+                    <strong>{copy.nearbyEmpty}</strong>
+                    <p>{copy.nearbyHelp}</p>
+                  </div>
+                )}
+              </section>
+              <div className="share-columns">
+                <section className="file-panel">
+                  <div className="section-heading">
+                    <h2>{copy.yourFile}</h2>
+                    <span className="step">02</span>
+                  </div>
+                  <div
+                    className={`file-drop ${selectedFile ? "has-file" : ""}`}
+                  >
+                    {selectedFile ? (
+                      <>
+                        <span className="large-file">
+                          <File size={32} strokeWidth={1.3} />
+                        </span>
+                        <strong>{selectedFile.name}</strong>
+                        <span className="muted">
+                          {formatBytes(selectedFile.bytes)}
+                        </span>
+                        <button
+                          className="text-button"
+                          disabled={Boolean(outgoing)}
+                          onClick={() => void chooseFile()}
+                        >
+                          {copy.chooseAnother}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="upload-symbol">
+                          <Upload size={27} strokeWidth={1.4} />
+                        </span>
+                        <strong>{copy.fileEmpty}</strong>
+                        <p>{copy.fileHint}</p>
+                        <button
+                          className="secondary"
+                          disabled={bridge.pending || Boolean(outgoing)}
+                          onClick={() => void chooseFile()}
+                        >
+                          <File size={15} />
+                          {copy.chooseFile}
+                        </button>
+                      </>
+                    )}
+                    {selectedFile ? (
+                      <button
+                        className="icon-button remove-file"
+                        aria-label={copy.remove}
+                        onClick={() => setSelectedFile(null)}
+                      >
+                        <X size={15} />
+                      </button>
+                    ) : null}
+                  </div>
+                  <button
+                    className="primary send-button"
+                    disabled={
+                      !connected ||
+                      !target ||
+                      !selectedFile ||
+                      Boolean(outgoing) ||
+                      Boolean(snapshot.resolving_peer) ||
+                      bridge.pending
+                    }
+                    onClick={() => void sendFile()}
+                  >
+                    <ArrowUpRight size={18} />
+                    {target
+                      ? `${copy.sendTo} ${target.name ?? copy.appleDevice}`
+                      : copy.send}
+                  </button>
+                </section>
+                <section className="receive-panel">
+                  <span className="receive-symbol">
+                    <ArrowDownToLine size={27} strokeWidth={1.3} />
+                  </span>
+                  <h2>{connected ? copy.receiver : copy.receiverOffline}</h2>
+                  <p>{connected ? copy.receiverHelp : copy.connectionHelp}</p>
+                  <div className="receive-identity">
+                    <Laptop size={18} />
+                    <strong>AirBridge PC</strong>
+                    <span className={`dot ${connected ? "green" : "gray"}`} />
+                  </div>
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      void bridge.call("open_receive_folder", {
+                        transferId: null,
+                      })
+                    }
+                  >
+                    <FolderOpen size={16} />
+                    {copy.openFolder}
+                    <ChevronRight size={14} />
+                  </button>
+                </section>
+              </div>
+              <section className="recent-section">
+                <div className="section-heading">
+                  <h2>{copy.recent}</h2>
+                  <button
+                    className="text-button"
+                    onClick={() => setPage("activity")}
+                  >
+                    {copy.allActivity}
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+                {snapshot.transfers.length ? (
+                  snapshot.transfers
+                    .slice(0, 3)
+                    .map((transfer) => (
+                      <TransferRow
+                        key={transfer.id}
+                        transfer={transfer}
+                        copy={copy}
+                        onDetails={() => setDetailId(transfer.id)}
+                      />
+                    ))
+                ) : (
+                  <p className="empty-recent">{copy.emptyActivityHelp}</p>
+                )}
+              </section>
+            </>
+          ) : page === "activity" ? (
+            <section className="activity-panel">
+              <div className="section-heading">
+                <h2>{copy.today}</h2>
+                <span className="subtle-count">
+                  {snapshot.transfers.length}
+                </span>
+              </div>
+              {snapshot.transfers.length ? (
+                snapshot.transfers.map((transfer) => (
+                  <TransferRow
+                    key={transfer.id}
+                    transfer={transfer}
+                    copy={copy}
+                    onDetails={() => setDetailId(transfer.id)}
+                  />
+                ))
+              ) : (
+                <div className="empty-activity">
+                  <Activity size={38} strokeWidth={1} />
+                  <h2>{copy.emptyActivity}</h2>
+                  <p>{copy.emptyActivityHelp}</p>
+                </div>
+              )}
+            </section>
+          ) : (
+            <div className="settings-stack">
+              <section className="setting-card">
+                <div className="setting-icon">
+                  <Globe2 size={21} />
+                </div>
+                <div className="setting-copy">
+                  <h2>{copy.language}</h2>
+                  <p>{copy.languageHelp}</p>
+                </div>
+                <select
+                  aria-label={copy.language}
+                  value={language}
+                  onChange={(event) =>
+                    setLanguage(event.target.value as Language)
+                  }
+                >
+                  <option value="en">English</option>
+                  <option value="zh-Hant">繁體中文</option>
+                  <option value="es">Español</option>
+                </select>
+              </section>
+              <section className="setting-card folder-setting">
+                <div className="setting-icon">
+                  <FolderOpen size={21} />
+                </div>
+                <div className="setting-copy">
+                  <h2>{copy.receiveFolder}</h2>
+                  <p className="folder-path">{snapshot.receive_directory}</p>
+                  {connected ? <p>{copy.disconnectFolder}</p> : null}
+                </div>
+                <button
+                  className="secondary compact"
+                  disabled={connected || bridge.pending}
+                  onClick={async () => {
+                    const folder = await bridge.call<string | null>(
+                      "choose_receive_folder",
+                    );
+                    if (folder) await bridge.refresh();
+                  }}
+                >
+                  {copy.changeFolder}
+                </button>
+              </section>
+              <section className="about-card">
+                <span className="setting-icon">
+                  <ShieldCheck size={23} />
+                </span>
+                <h2>{copy.about}</h2>
+                <p>{copy.privacy}</p>
+                <dl>
+                  <div>
+                    <dt>{copy.version}</dt>
+                    <dd>0.4.0</dd>
+                  </div>
+                  <div>
+                    <dt>{copy.hardware}</dt>
+                    <dd>ESP32-S3 · PSRAM</dd>
+                  </div>
+                  <div>
+                    <dt>{copy.transport}</dt>
+                    <dd>USB Serial/JTAG · COM4</dd>
+                  </div>
+                </dl>
+                <div className="compatibility">
+                  <h3>{copy.currentLimits}</h3>
+                  <p>{copy.limits}</p>
+                  <p>{copy.reliability}</p>
+                  <p>{copy.receivingAuto}</p>
+                </div>
+              </section>
+            </div>
+          )}
+          <footer>
+            <span className="footer-mark" />
+            AirBridge
+            <span className="footer-divider" />
+            {copy.help}
+          </footer>
+        </div>
+      </main>
+      {detail ? (
+        <TransferDetails
+          transfer={detail}
+          copy={copy}
+          onClose={() => setDetailId(null)}
+          onFolder={() =>
+            void bridge.call("open_receive_folder", { transferId: detail.id })
+          }
+          onCancel={() => void bridge.call("cancel_transfer")}
+        />
+      ) : null}
+    </div>
+  );
+}

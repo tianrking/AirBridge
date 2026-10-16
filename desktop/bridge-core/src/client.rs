@@ -28,6 +28,7 @@ pub struct Client {
     sequence: u32,
     replies: BTreeMap<u32, Value>,
     completion: Option<Value>,
+    resolution: Option<Value>,
     transfer_id: Option<String>,
     capabilities: Option<Value>,
     events: Events,
@@ -65,6 +66,7 @@ impl Client {
             sequence: 0,
             replies: BTreeMap::new(),
             completion: None,
+            resolution: None,
             transfer_id: None,
             capabilities: None,
             events,
@@ -91,6 +93,18 @@ impl Client {
         (client.events)(
             json!({"event":"connected","port":PORT,"usb_serial":USB_SERIAL,"capabilities":hello}),
         );
+        if hello["resolve"] == true {
+            if let Some(peer) = hello["paired_peer"]
+                .as_str()
+                .filter(|peer| protocol::mac(peer))
+            {
+                if let Err(error) = client.resolve(peer, 8770) {
+                    (client.events)(
+                        json!({"event":"resolution_error","mac":peer,"message":format!("{error:#}")}),
+                    );
+                }
+            }
+        }
         Ok(client)
     }
     fn request_body(&mut self, body: String, timeout: Duration) -> Result<Value> {
@@ -169,15 +183,25 @@ impl Client {
                     self.completion = Some(event.clone());
                     (self.events)(event.clone());
                 }
-                "outgoing_peer" => {
+                "outgoing_peer" | "peer_resolved" => {
                     let name = String::from_utf8(
                         STANDARD
                             .decode(event["name_b64"].as_str().context("Missing native name")?)?,
                     )?;
                     ensure!(name.len() <= 256, "Native name exceeds bound");
-                    (self.events)(
-                        json!({"event":"peer_name","display_name":name,"name_source":"airdrop_discover"}),
-                    );
+                    if kind == "peer_resolved" {
+                        (self.events)(
+                            json!({"event":"peer_identity","mac":event["mac"],"display_name":name,"name_source":"airdrop_discover","error":0,"http_status":200}),
+                        );
+                    } else {
+                        (self.events)(
+                            json!({"event":"peer_name","display_name":name,"name_source":"airdrop_discover"}),
+                        );
+                    }
+                }
+                "resolution_complete" => {
+                    self.resolution = Some(event.clone());
+                    (self.events)(event.clone());
                 }
                 "scanner_status" => {
                     (self.events)(json!({"event":"peers","peers":event["peers"]}));
@@ -196,6 +220,33 @@ impl Client {
             }
         }
         Ok(())
+    }
+    pub fn resolve(&mut self, peer: &str, port: u16) -> Result<()> {
+        ensure!(
+            self.capabilities.as_ref().is_some_and(|value| value["resolve"] == true),
+            "This firmware resolves the configured device automatically; manual name queries need newer firmware"
+        );
+        ensure!(
+            protocol::mac(peer) && port > 0,
+            "Invalid recipient endpoint"
+        );
+        self.resolution = None;
+        (self.events)(json!({"event":"resolution_started","mac":peer}));
+        self.request(&format!("RESOLVE {peer} {port}"))?;
+        let end = Instant::now() + Duration::from_secs(90);
+        while Instant::now() < end {
+            if let Some(result) = self.resolution.as_ref() {
+                ensure!(
+                    result["mac"] == peer && result["error"] == 0 && result["http_status"] == 200,
+                    "The recipient did not answer its native name query (error {}, HTTP {})",
+                    result["error"],
+                    result["http_status"]
+                );
+                return Ok(());
+            }
+            self.poll()?;
+        }
+        bail!("Native device-name query timed out")
     }
     pub fn send(&mut self, path: &Path, peer: &str, port: u16) -> Result<()> {
         ensure!(
@@ -274,7 +325,8 @@ impl Client {
             if let Some(outcome) = self.completion.as_ref() {
                 ensure!(
                     outcome["success"] == true && outcome["http_status"] == 200,
-                    "Native transfer failed: {outcome}"
+                    "AirDrop did not complete (error {}, HTTP {}). The file was not automatically resent.",
+                    outcome["error"], outcome["http_status"]
                 );
                 ensure!(
                     outcome["bytes"].as_u64() == Some(data.len() as u64)

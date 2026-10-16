@@ -10,7 +10,13 @@
 
 </div>
 
-AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows mediante un puerto serie. Su núcleo portátil en C++17 implementa las tramas AWDL, la sincronización y el análisis del protocolo; ESP-IDF 6.1 proporciona el backend de radio. La aplicación de escritorio con Tauri 2 está prevista.
+AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows mediante un puerto serie. Su núcleo portátil en C++17 implementa las tramas AWDL, la sincronización y el análisis del protocolo; ESP-IDF 6.1 proporciona el backend de radio. La aplicación de escritorio Tauri 2 utiliza React, TypeScript y un único actor serie en Rust.
+
+## Aplicación de escritorio
+
+Incluye selección de dispositivos, diálogos nativos de archivos y carpetas, progreso bidireccional, cancelación, ubicación de recepción y detalles de transferencia. Inglés por defecto, con chino tradicional y español en Ajustes. Los nombres proceden de `/Discover`; los nombres sin resolver se indican explícitamente.
+
+[Compilación y uso](desktop/README.md) · [Estado medido del escritorio](docs/desktop-qualification.md)
 
 ## Estado del proyecto
 
@@ -24,7 +30,8 @@ Finder de macOS encontró **AirBridge PC** y entregó un binario de 262.145 byte
 | Nombres nativos de dispositivos | Verificados mediante TLS `/Discover` |
 | Archivos de Mac → Windows | Texto y binario de 262.145 bytes verificados |
 | Archivos de Windows → Mac | Binario de 65.537 bytes e ida y vuelta con el mismo firmware verificados |
-| Aplicación de escritorio | Tauri 2 · React · TypeScript · Rust — prevista |
+| Backend Rust | Ida y vuelta nativa de 4.097 bytes verificada sin Python |
+| Aplicación de escritorio | Versión de desarrollo; conexión real y nombres nativos comprobados; validación de archivos de escritorio pendiente |
 
 <details>
 <summary>Huella del binario verificado</summary>
@@ -176,7 +183,8 @@ La MAC AWDL, la instancia DNS, la etiqueta del host y el nombre de AirDrop son i
 - [x] Envío independiente de Windows a Apple e ida y vuelta binaria con el mismo firmware verificados
 - [ ] Detección estable, recuperación de conexiones y estados de error claros
 - [ ] Selección de más dispositivos, nombres reales y progreso de transferencia
-- [ ] Aplicación de escritorio con Tauri 2, React, TypeScript y Rust
+- [x] Versión de desarrollo con Tauri 2, React, TypeScript y Rust
+- [ ] Validación dúplex de escritorio empaquetado y detección sostenida
 - [ ] Ampliación de las pruebas de dispositivos, tamaños de archivo y transportes
 
 ## Agradecimientos

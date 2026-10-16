@@ -10,7 +10,13 @@
 
 </div>
 
-AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。可攜式 C++17 核心實作 AWDL 封包、同步與協定解析，ESP-IDF 6.1 提供無線後端；Tauri 2 桌面應用程式仍在規劃中。
+AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。可攜式 C++17 核心實作 AWDL 封包、同步與協定解析，ESP-IDF 6.1 提供無線後端；Tauri 2 桌面應用程式採用 React、TypeScript 與單一 Rust 序列埠處理器。
+
+## 桌面應用程式
+
+包含裝置選擇、原生檔案與資料夾選擇器、雙向進度、取消、接收位置與傳輸詳情。預設英文，設定中可選繁體中文與西班牙文。名稱取自原生 `/Discover`；尚未解析時會明確標示。
+
+[桌面建置與操作](desktop/README.md) · [桌面實測狀態](docs/desktop-qualification.md)
 
 ## 專案狀態
 
@@ -24,7 +30,8 @@ macOS Finder 已找到 **AirBridge PC**，並成功傳送 262,145 位元組二�
 | 原生裝置名稱 | 已透過 TLS `/Discover` 驗證 |
 | Mac → Windows 檔案接收 | 已驗證文字檔與 262,145 位元組二進位檔 |
 | Windows → Mac 檔案傳送 | 已驗證 65,537 位元組二進位檔與同韌體往返 |
-| 桌面應用程式 | Tauri 2 · React · TypeScript · Rust — 規劃中 |
+| Rust 傳輸後端 | 已獨立驗證 4,097 位元組原生二進位檔往返，傳輸未使用 Python |
+| 桌面應用程式 | 開發版本已可連接硬體並顯示原生名稱；桌面檔案互通仍在驗收 |
 
 <details>
 <summary>已驗證的二進位檔指紋</summary>
@@ -171,7 +178,8 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 - [x] 獨立實作 Windows → Apple 傳送與同韌體二進位檔往返驗證
 - [ ] 穩定發現、重新連線復原與明確的失敗狀態
 - [ ] 擴充對端選擇、真實名稱與傳輸進度
-- [ ] 以 Tauri 2、React、TypeScript 與 Rust 製作桌面應用程式
+- [x] 以 Tauri 2、React、TypeScript 與 Rust 製作桌面開發版本
+- [ ] 桌面封裝版本的原生雙向與持續發現驗收
 - [ ] 擴充裝置、檔案大小與傳輸介面的驗證範圍
 
 ## 致謝
