@@ -33,8 +33,9 @@ orders by metric, counter, path length and transmitter address. These are testab
 implementation choices, not proof that every Apple device will accept this bridge.
 
 AWDL host names and native AirDrop display names are different protocol facts.
-The former may be read from management announcements. The latter will require a
-bounded `/Discover` response parser. Neither MAC addresses nor RSSI prove identity.
+The former may be read from management announcements. The latter is parsed by
+the bounded TLS `/Discover` client and binary-plist reader; a real UTF-8 display
+name has been verified on macOS. Neither MAC addresses nor RSSI prove identity.
 
 Hardware captures and earlier firmware results are not committed as qualifications
 for this new implementation. Native transfer success will be recorded only after
