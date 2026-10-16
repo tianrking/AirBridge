@@ -48,3 +48,31 @@ The accepted 1 Mbps image is currently retained locally as
 `--seconds 0`; the temporary timed flash/rollback harness was stopped without
 rebooting the board, preserving the accepted current identity. The 6 Mbps binary
 receive image is retained separately. Neither includes qualification for sending.
+
+## Optional IBSS liveness comparison
+
+The Linux reference documents an IBSS cell with infrequent beacons. AirBridge's
+independent optional encoder emits a bounded, own-source channel-6 IBSS beacon
+approximately every 10.24 seconds. It is enabled only with `-IbssBeacon`; every
+build explicitly sets the option, so omission disables it even in a reused cache.
+The raw-frame guard accepts only this exact own-source beacon profile when enabled.
+Portable checks cover truncation, transmitter identity and channel changes.
+
+The first comparison image had SHA256
+`43d7bf825fea9193549727a3b4abe546cdb9c66b09dd1b5345332205ed538b46`.
+The replacement board retained identity `ca:86:15:45:c4:2f`. On the Mac, actual
+Peer Presence was recorded at 21:29:18, absence at 21:29:57 and renewed presence
+at 21:29:59 (Asia/Shanghai, 2026-10-16). Native TLS and `/Discover` completed at
+21:30:32 for that identity. Thus this was actual native discovery, not merely a
+driver TX acknowledgement. The absence still prevents a sustained-visibility claim.
+
+An outbound name query subsequently received TCP Reset from the Mac's port 8770.
+The current source adds bounded recovery for that read-only connection case.
+Its compiled candidate is distinct from the comparison image above; that final
+change has not yet passed a native file test. Neither beacon effectiveness nor
+causation has been established by this comparison, and no GUI file qualification
+is inherited from older sender images. Keep the previously qualified duplex
+image `work/native-sender-wake.bin` as the local rollback.
+
+Reference facts: [omdrop-owl exclusive mode](https://github.com/t4t5/omdrop-owl#exclusive-mode)
+and [Espressif raw frame guidance](https://documentation.espressif.com/projects/esp-idf/en/latest/esp32s3/api-guides/wifi-driver/wifi-vendor-features.html).

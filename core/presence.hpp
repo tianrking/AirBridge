@@ -10,6 +10,10 @@ struct Presence {
     ChannelPlan advertised{};
 };
 struct ManagementFrame {std::array<std::uint8_t,512> bytes{};std::size_t length{};};
+// Optional fixed-channel IBSS liveness comparison; not an infrastructure AP.
+Error encode_ibss_beacon(const Mac& source, std::uint16_t sequence,
+                         std::uint64_t now_us, ManagementFrame& output);
+bool valid_ibss_beacon(Bytes frame, const Mac& source);
 Error encode_presence(const Presence& state,std::uint8_t kind,std::uint16_t sequence,
                       std::uint64_t now_us,ManagementFrame& output);
 struct DataFrame {std::array<std::uint8_t,1322> bytes{};std::size_t length{};};

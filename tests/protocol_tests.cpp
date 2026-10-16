@@ -164,4 +164,16 @@ static void identities() {
     require(airbridge::discovery::parse_http_response(wire.data(),wire.size(),response)==Error::malformed,"conflicting HTTP framing rejects");
 }
 unsigned transfer_checks();
-int main() {parsing();clocks();selection();data();discovery();encoding();identities();checks+=transfer_checks();std::cout<<checks<<" protocol checks passed\n";}
+static void beacons() {
+    ManagementFrame frame{};
+    require(encode_ibss_beacon(self,4095,0x123456789abcdef0ULL,frame)==Error::none,"own-source IBSS beacon builds");
+    require(frame.length==59 && frame.bytes[0]==0x80 && frame.bytes[34]==2,"IBSS capability without infrastructure AP");
+    require(valid_ibss_beacon({frame.bytes.data(),frame.length},self),"bounded own-source IBSS beacon passes guard");
+    require(!valid_ibss_beacon({frame.bytes.data(),frame.length},sender),"beacon cannot impersonate a different transmitter");
+    for(std::size_t size=0;size<frame.length;size++)
+        require(!valid_ibss_beacon({frame.bytes.data(),size},self),"truncated beacon rejects");
+    frame.bytes[54]=11;
+    require(!valid_ibss_beacon({frame.bytes.data(),frame.length},self),"off-channel beacon rejects");
+    require(encode_ibss_beacon(Mac{},0,0,frame)==Error::malformed,"zero beacon transmitter rejects");
+}
+int main() {parsing();clocks();selection();data();discovery();encoding();identities();beacons();checks+=transfer_checks();std::cout<<checks<<" protocol checks passed\n";}

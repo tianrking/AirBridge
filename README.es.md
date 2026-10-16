@@ -147,7 +147,7 @@ python -m unittest discover -s tests -p "test_*.py" -q
 flowchart LR
   Apple["Dispositivo Apple"] <-->|"AWDL · IPv6 · TLS"| ESP["ESP32-S3 / ESP-IDF 6.1"]
   ESP <-->|"Serie"| PC["Equipo Windows"]
-  PC -.-> UI["Escritorio Tauri 2 · previsto"]
+  PC <--> UI["Tauri 2 · React · TypeScript · Rust"]
 ```
 
 AWDL transporta IPv6, mDNS localiza el servicio AirDrop y TLS transporta las solicitudes de descubrimiento y transferencia. Bluetooth emite un anuncio de activación no conectable. El adaptador Wi-Fi de Windows no necesita inyección AWDL.

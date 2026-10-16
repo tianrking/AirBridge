@@ -1,6 +1,7 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 // ESP-IDF 6.1 S3 diagnostic ABI adapter, restricted to this radio's AWDL frames.
 #include "awdl.hpp"
+#include "presence.hpp"
 #include "esp_err.h"
 #include <atomic>
 #include <cstring>
@@ -15,6 +16,9 @@ extern "C" int ieee80211_raw_frame_sanity_check(int interface_id,const void* buf
     const auto* p=static_cast<const std::uint8_t*>(buffer);
     constexpr std::uint8_t bssid[]={0,0x25,0,0xff,0x94,0x73};
     if(std::memcmp(p+10,own.data(),6) || std::memcmp(p+16,bssid,6)) return ESP_ERR_INVALID_ARG;
+#ifdef AIRBRIDGE_IBSS_BEACON
+    if(p[0]==0x80) return valid_ibss_beacon({p,std::size_t(length)},own) ? ESP_OK : ESP_ERR_INVALID_ARG;
+#endif
     if((p[0]&0xfc)==0xd0) {
         if(length>512) return ESP_ERR_INVALID_ARG;
         Announcement parsed{};

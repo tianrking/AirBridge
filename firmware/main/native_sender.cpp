@@ -34,10 +34,14 @@ using namespace airbridge;
 namespace {
 constexpr std::size_t maximum_file = 1024 * 1024, maximum_metadata = 131072;
 awdl::Mac identity{}, permitted_peer{};
+struct ObservedPeer { awdl::Mac mac{}; std::uint16_t port{}; std::uint64_t received{}; };
+std::array<ObservedPeer, 12> observed{};
+awdl::Mac preferred_peer{};
+portMUX_TYPE peer_lock = portMUX_INITIALIZER_UNLOCKED;
 std::atomic<bool> busy{}, cancelled{};
 serial::ReplayGuard replay;
 std::array<char, 17> session{};
-std::array<char, 320> last_reply{};
+std::array<char, 512> last_reply{};
 struct Upload {
     std::uint8_t *file{}, *metadata{};
     std::size_t size{}, metadata_size{}, written{}, metadata_written{};
@@ -45,7 +49,20 @@ struct Upload {
     std::array<char, 65> digest{};
     native::AskManifest manifest{};
     std::uint16_t port{};
+    awdl::Mac peer{};
+    bool resolve_only{};
 } upload;
+bool eligible_peer(const awdl::Mac& peer, std::uint16_t port) {
+    if (peer == permitted_peer) return true;
+    bool found = false;
+    const auto now = std::uint64_t(esp_timer_get_time());
+    portENTER_CRITICAL(&peer_lock);
+    for (const auto& item : observed)
+        if (item.mac == peer && item.port == port && now >= item.received && now - item.received < 10'000'000)
+            found = true;
+    portEXIT_CRITICAL(&peer_lock);
+    return found;
+}
 void clear_upload() {
     free(upload.file);
     free(upload.metadata);
@@ -61,7 +78,8 @@ bool record(const char* format, ...) {
            serial_record(line.data(), std::size_t(size));
 }
 void stage(const char* name, unsigned status = 0) {
-    record("{\"event\":\"outgoing_stage\",\"stage\":\"%s\",\"http_status\":%u}\n", name, status);
+    record("{\"event\":\"%s\",\"stage\":\"%s\",\"http_status\":%u}\n",
+           upload.resolve_only ? "resolve_stage" : "outgoing_stage", name, status);
 }
 bool retry(int result) {
     return result == MBEDTLS_ERR_SSL_WANT_READ || result == MBEDTLS_ERR_SSL_WANT_WRITE;
@@ -150,7 +168,7 @@ struct Client {
         address.sin6_family = AF_INET6;
         address.sin6_port = htons(upload.port);
         address.sin6_scope_id = ipv6_link_index();
-        const auto ip = awdl::link_local(permitted_peer);
+        const auto ip = awdl::link_local(upload.peer);
         std::memcpy(&address.sin6_addr, ip.data(), ip.size());
         rc = connect(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
         if (rc < 0) {
@@ -275,13 +293,20 @@ void send_worker(void*) {
         int rc = client->initialize();
         if (rc)
             return rc;
-        stage("wake_peer");
-        rc = ble_presence_refresh();
-        if (rc)
-            return rc;
-        vTaskDelay(pdMS_TO_TICKS(750));
         stage("discover_connect");
         rc = client->connect_peer();
+        // Keep a live native listener and admitted neighbor undisturbed. Only
+        // retry the read-only discovery connection; Ask/Upload are never replayed.
+        for (unsigned attempt = 0; rc && attempt < 2 && !cancelled; ++attempt) {
+            if (rc != -ETIMEDOUT && rc != -ECONNREFUSED && rc != -ECONNRESET && rc != -EHOSTUNREACH)
+                break;
+            stage("wake_peer");
+            const auto wake = ble_presence_refresh();
+            if (wake) return wake;
+            vTaskDelay(pdMS_TO_TICKS(750));
+            stage("discover_connect");
+            rc = client->connect_peer();
+        }
         if (rc)
             return rc;
         const auto request = discovery::discover_request(111611);
@@ -303,6 +328,13 @@ void send_worker(void*) {
                                   reinterpret_cast<const unsigned char*>(peer.name.data()),
                                   std::strlen(peer.name.data())))
             return -EINVAL;
+        if (upload.resolve_only) {
+            const auto& p = upload.peer;
+            record("{\"event\":\"peer_resolved\",\"mac\":\"%02x:%02x:%02x:%02x:%02x:%02x\","
+                   "\"name_b64\":\"%s\",\"name_source\":\"airdrop_discover\"}\n",
+                   p[0],p[1],p[2],p[3],p[4],p[5],encoded.data());
+            return 0;
+        }
         record("{\"event\":\"outgoing_peer\",\"name_b64\":\"%s\"}\n", encoded.data());
         // Apple's Discover handler is disposable. Ask and Upload use a fresh connection.
         stage("ask_connect");
@@ -375,7 +407,11 @@ void send_worker(void*) {
     result = perform();
     if (client && !status)
         status = client->http_status;
-    record(
+    if (upload.resolve_only) {
+        const auto& p = upload.peer;
+        record("{\"event\":\"resolution_complete\",\"mac\":\"%02x:%02x:%02x:%02x:%02x:%02x\","
+               "\"error\":%d,\"http_status\":%u}\n",p[0],p[1],p[2],p[3],p[4],p[5],result,status);
+    } else record(
         "{\"event\":\"outgoing_complete\",\"success\":%s,\"error\":%d,\"http_status\":%u,"
         "\"transfer_id\":\"%s\",\"bytes\":%u,\"sha256\":\"%s\",\"elapsed_ms\":%llu}\n",
         result == 0 ? "true" : "false", result, status, upload.manifest.transfer_id.data(),
@@ -411,15 +447,17 @@ bool hexadecimal(const char* value, std::size_t size, std::uint8_t* result = nul
 }
 void reply(const serial::Command& command, bool okay, const char* reason, std::size_t offset = 0,
            bool remember = true) {
-    std::array<char, 320> line{};
+    std::array<char, 512> line{};
     const int count =
         std::snprintf(line.data(), line.size(),
                       "{\"event\":\"command_reply\",\"sequence\":%lu,\"ok\":%s,\"reason\":\"%s\","
                       "\"offset\":%u,\"protocol\":2,\"max_file\":%u,\"chunk_bytes\":112,\"radio_"
-                      "mac\":\"%02x:%02x:%02x:%02x:%02x:%02x\"}\n",
+                      "mac\":\"%02x:%02x:%02x:%02x:%02x:%02x\",\"resolve\":true,"
+                      "\"paired_peer\":\"%02x:%02x:%02x:%02x:%02x:%02x\"}\n",
                       static_cast<unsigned long>(command.sequence), okay ? "true" : "false", reason,
                       unsigned(offset), unsigned(maximum_file), identity[0], identity[1],
-                      identity[2], identity[3], identity[4], identity[5]);
+                      identity[2], identity[3], identity[4], identity[5],permitted_peer[0],permitted_peer[1],
+                      permitted_peer[2],permitted_peer[3],permitted_peer[4],permitted_peer[5]);
     if (count > 0 && std::size_t(count) < line.size()) {
         if (remember) {
             replay.remember(command);
@@ -432,6 +470,22 @@ void reply(const serial::Command& command, bool okay, const char* reason, std::s
 void native_sender_begin(const awdl::Mac& own, const awdl::Mac& permitted) {
     identity = own;
     permitted_peer = permitted;
+    preferred_peer = permitted;
+}
+void native_sender_observe(const awdl::Announcement& peer, std::uint64_t received_us) {
+    if (!peer.service.airdrop || !peer.service.port || (peer.source[0] & 1) || peer.source == identity) return;
+    portENTER_CRITICAL(&peer_lock);
+    auto* selected = &observed[0];
+    for (auto& item : observed) {
+        if (item.mac == peer.source) { selected = &item; break; }
+        if (item.received < selected->received) selected = &item;
+    }
+    *selected = {peer.source, peer.service.port, received_us};
+    portEXIT_CRITICAL(&peer_lock);
+}
+bool native_sender_sync_peer(awdl::Mac& peer) {
+    portENTER_CRITICAL(&peer_lock); peer = preferred_peer; portEXIT_CRITICAL(&peer_lock);
+    return peer != awdl::Mac{};
 }
 bool native_sender_command(awdl::Bytes line) {
     if (line.size < 4 || std::memcmp(line.data, "AB2 ", 4))
@@ -497,6 +551,23 @@ bool native_sender_command(awdl::Bytes line) {
         reply(command, false, "busy");
         return true;
     }
+    if (!std::strncmp(body, "RESOLVE ", 8)) {
+        unsigned octets[6]{}, port = 0;
+        char extra = 0;
+        if (std::sscanf(body + 8, "%2x:%2x:%2x:%2x:%2x:%2x %u %c", &octets[0], &octets[1],
+                        &octets[2], &octets[3], &octets[4], &octets[5], &port, &extra) != 7 || !port || port > 65535) {
+            reply(command, false, "invalid_recipient"); return true;
+        }
+        awdl::Mac requested{}; for (unsigned i=0;i<6;i++) requested[i]=std::uint8_t(octets[i]);
+        if (!eligible_peer(requested,std::uint16_t(port))) {reply(command,false,"recipient_not_advertised");return true;}
+        clear_upload(); upload.peer=requested;upload.port=std::uint16_t(port);upload.resolve_only=true;
+        portENTER_CRITICAL(&peer_lock);preferred_peer=requested;portEXIT_CRITICAL(&peer_lock);
+        cancelled=false;busy=true;
+        if (xTaskCreatePinnedToCore(send_worker,"airdrop_resolve",16384,nullptr,1,nullptr,1)!=pdPASS) {
+            busy=false;clear_upload();reply(command,false,"out_of_memory");return true;
+        }
+        reply(command,true,"resolving");return true;
+    }
     if (!std::strncmp(body, "BEGIN ", 6)) {
         unsigned long size = 0, metadata = 0, port = 0;
         std::array<char, 65> digest{};
@@ -513,7 +584,7 @@ bool native_sender_command(awdl::Bytes line) {
             requested[i] = std::uint8_t(octets[i]);
         std::array<std::uint8_t, 32> hash{};
         if (count != 5 || size > maximum_file || metadata < 40 || metadata > maximum_metadata ||
-            !port || port > 65535 || fields != 6 || requested != permitted_peer ||
+            !port || port > 65535 || fields != 6 || !eligible_peer(requested,std::uint16_t(port)) ||
             !hexadecimal(digest.data(), 64, hash.data())) {
             reply(command, false, "invalid_begin");
             return true;
@@ -532,6 +603,8 @@ bool native_sender_command(awdl::Bytes line) {
         upload.metadata_size = metadata;
         upload.expected_hash = hash;
         upload.port = std::uint16_t(port);
+        upload.peer = requested;
+        portENTER_CRITICAL(&peer_lock);preferred_peer=requested;portEXIT_CRITICAL(&peer_lock);
         constexpr char digits[] = "0123456789abcdef";
         for (unsigned i = 0; i < 32; i++) {
             upload.digest[i * 2] = digits[hash[i] >> 4];

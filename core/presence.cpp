@@ -32,6 +32,34 @@ void plan(Writer& out,const ChannelPlan& channels) {
 bool valid_mac(const Mac& mac) {return !(mac[0]&1) && std::any_of(mac.begin(),mac.end(),[](auto c){return c!=0;});}
 }
 
+Error encode_ibss_beacon(const Mac& source, std::uint16_t sequence,
+                         std::uint64_t now_us, ManagementFrame& output) {
+    if (!valid_mac(source)) return Error::malformed;
+    ManagementFrame draft{}; Writer out{draft.bytes.data(),draft.bytes.size()};
+    Mac broadcast{}; broadcast.fill(255);
+    wifi_header(out,0x80,source,broadcast,sequence);
+    out.u32(std::uint32_t(now_us)); out.u32(std::uint32_t(now_us>>32));
+    out.u16(10000); out.u16(2); // TU interval, IBSS capability.
+    constexpr std::uint8_t elements[]={
+        0,4,'a','w','d','l',
+        1,8,0x82,0x84,0x8b,0x96,0x0c,0x18,0x30,0x6c,
+        3,1,6, // DS channel 6.
+        6,2,0,0 // IBSS ATIM window zero.
+    };
+    out.block(elements,sizeof(elements));
+    if (!out.valid) return Error::truncated;
+    draft.length=out.position; output=draft; return Error::none;
+}
+bool valid_ibss_beacon(Bytes frame, const Mac& source) {
+    if (!frame.data || frame.size<36) return false;
+    std::uint64_t timestamp=0;
+    for (unsigned i=0;i<8;++i) timestamp|=std::uint64_t(frame.data[24+i])<<(8*i);
+    const auto sequence=std::uint16_t((unsigned(frame.data[22])|unsigned(frame.data[23])<<8)>>4);
+    ManagementFrame expected{};
+    return encode_ibss_beacon(source,sequence,timestamp,expected)==Error::none &&
+           frame.size==expected.length && !std::memcmp(frame.data,expected.bytes.data(),frame.size);
+}
+
 Error encode_presence(const Presence& state,std::uint8_t kind,std::uint16_t sequence,
                       std::uint64_t now_us,ManagementFrame& output) {
     if(!state.clock.valid() || !valid_mac(state.source) || !valid_mac(state.root) || !valid_mac(state.parent) ||

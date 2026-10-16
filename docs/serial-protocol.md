@@ -45,6 +45,7 @@ have an uncertain result. Reconcile status or start a fresh idle session first.
 | Verb | Arguments | Result |
 | --- | --- | --- |
 | `HELLO` | session nonce | Negotiate a session while idle |
+| `RESOLVE` | peer AWDL MAC, advertised port | Read-only native TLS `/Discover`; no file offer |
 | `BEGIN` | file bytes, manifest bytes, SHA256, peer AWDL MAC, port | Allocate bounded PSRAM staging |
 | `META` | exact offset, Base64 bytes | Stage a binary-plist Ask manifest |
 | `DATA` | exact offset, Base64 bytes | Stage source file bytes |
@@ -53,15 +54,31 @@ have an uncertain result. Reconcile status or start a fresh idle session first.
 | `CANCEL` | none | Release idle staging or request cooperative native cancellation |
 
 Chunks contain at most 112 decoded bytes. File staging is at most 1 MiB and
-manifest staging at most 128 KiB. The initial sender accepts one regular file
-and the explicitly configured Apple peer. Larger sources are rejected before
+manifest staging at most 128 KiB. The sender accepts one regular file. The configured
+Apple peer remains the qualified recipient; the new development resolver and sender
+can also target a recently observed AirDrop offer with its matching advertised port.
+Those additional devices are not file-qualified. Incoming access remains restricted
+to the configured peer. Larger sources are rejected before
 native file requests. Streaming beyond these limits is future qualification.
 
 A `command_reply` includes `sequence`, `ok`, `reason`, `offset`, `protocol`,
-`max_file`, `chunk_bytes` and `radio_mac`. Wrong offsets, bad digests, mismatched
+`max_file`, `chunk_bytes` and `radio_mac`. New resolver-capable builds additionally
+return `resolve:true` and `paired_peer`; the host checks this capability before
+issuing `RESOLVE`. Connecting USB does not initiate a manual network query.
+Wrong offsets, bad digests, mismatched
 manifest sizes and incomplete staging never initiate native file delivery.
 
 ## Native events and incoming acknowledgements
+
+`resolve_stage` reports read-only connection stages. `peer_resolved` carries the
+selected MAC and native UTF-8 name as Base64. `resolution_complete` reports MAC,
+error and HTTP status. A failed name lookup must not be presented as a resolved
+device name or successful file transfer.
+
+Discovery may retry a failed connection at most twice, refreshing BLE wake presence
+between attempts. This applies only before the file offer; `/Ask` and `/Upload`
+are not automatically repeated. Directed presence follows the selected endpoint,
+while the AWDL clock still uses the validated metric-based election policy.
 
 `outgoing_stage` distinguishes Discover connection, Ask connection, waiting for
 native consent, accepted and uploading. `outgoing_peer` carries the UTF-8 native

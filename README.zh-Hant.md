@@ -142,7 +142,7 @@ python -m unittest discover -s tests -p "test_*.py" -q
 flowchart LR
   Apple["Apple 裝置"] <-->|"AWDL · IPv6 · TLS"| ESP["ESP32-S3 / ESP-IDF 6.1"]
   ESP <-->|"序列埠"| PC["Windows 主機"]
-  PC -.-> UI["Tauri 2 桌面 · 規劃中"]
+  PC <--> UI["Tauri 2 · React · TypeScript · Rust"]
 ```
 
 AWDL 承載 IPv6，mDNS 尋找 AirDrop 服務，TLS 承載發現與傳輸請求。藍牙提供不可連線的喚醒公告；Windows 無線網卡不需要具備 AWDL 注入能力。

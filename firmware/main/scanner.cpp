@@ -10,6 +10,7 @@
 #endif
 #ifdef AIRBRIDGE_NATIVE_SERVICE
 #include "native_receiver.hpp"
+#include "native_sender.hpp"
 #include "ble_presence.hpp"
 #include "serial_channel.hpp"
 #endif
@@ -195,10 +196,17 @@ extern "C" void app_main() {
     presence.self_metric=presence.root_metric=32;presence.self_counter=presence.root_counter=1;
     presence.clock.observe({own,64,0,16,4},std::uint64_t(esp_timer_get_time()));
     std::int64_t next_presence=0,next_direct_presence=0;std::uint16_t sequence=0;unsigned presence_ok=0,presence_failed=0;
+#ifdef AIRBRIDGE_IBSS_BEACON
+    std::int64_t next_beacon=0;
+#endif
 #endif
     for(;;) {
-        if(xQueueReceive(observations,&observation,pdMS_TO_TICKS(5))==pdTRUE && observation.announcement.source!=own)
+        if(xQueueReceive(observations,&observation,pdMS_TO_TICKS(5))==pdTRUE && observation.announcement.source!=own) {
             peers.update(observation.announcement,observation.rssi,observation.received);
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+            native_sender_observe(observation.announcement,observation.received);
+#endif
+        }
         const auto now=esp_timer_get_time();
 #ifdef AIRBRIDGE_IPV6_LINK
         ipv6_link_poll(peers,std::uint64_t(now));
@@ -231,7 +239,15 @@ extern "C" void app_main() {
         }
 #endif
 #ifdef AIRBRIDGE_PRESENCE_TX
-        if(const auto* selected=peers.select(own,std::uint64_t(now))) {
+#ifdef AIRBRIDGE_IBSS_BEACON
+        if(now>=next_beacon) {
+            next_beacon=now+10'240'000;
+            if(encode_ibss_beacon(own,sequence++,std::uint64_t(now),frame)==Error::none)
+                esp_wifi_80211_tx(WIFI_IF_STA,frame.bytes.data(),int(frame.length),true);
+        }
+#endif
+        const auto* sync_peer=peers.select(own,std::uint64_t(now));
+        if(const auto* selected=sync_peer) {
             const auto& info=selected->announcement;
             presence.root=info.election.root;presence.parent=info.source;presence.depth=info.election.depth+1;
             presence.root_metric=info.election.root_metric;presence.root_counter=info.election.root_counter;
@@ -249,14 +265,18 @@ extern "C" void app_main() {
         // A directed announcement pair can use the peer's actual channel-6
         // window and Wi-Fi acknowledgement/retries. Broadcast-only presence
         // must not be assumed to keep Apple's unicast neighbor state alive.
+        Mac presence_target=probe_target;
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+        native_sender_sync_peer(presence_target);
+#endif
         if(now>=next_direct_presence) for(const auto& peer:peers.rows()) {
-            if(!peer.used || peer.announcement.source!=probe_target || !peer.announcement.has_sync ||
+            if(!peer.used || peer.announcement.source!=presence_target || !peer.announcement.has_sync ||
                !peer.announcement.has_channels || std::uint64_t(now)<peer.sync_received_us ||
                std::uint64_t(now)-peer.sync_received_us>3'000'000) continue;
             Clock peer_clock;
             if(!peer_clock.observe(peer.announcement.sync,peer.sync_received_us) ||
                peer.announcement.channels.channel[peer_clock.slot(std::uint64_t(now))]!=6) break;
-            presence.destination=probe_target;next_direct_presence=now+500'000;
+            presence.destination=presence_target;next_direct_presence=now+500'000;
             for(const auto kind: {0,3}) {
                 const auto encoded=encode_presence(presence,std::uint8_t(kind),sequence++,std::uint64_t(now),frame);
                 const auto sent=encoded==Error::none ? esp_wifi_80211_tx(WIFI_IF_STA,frame.bytes.data(),int(frame.length),true) : ESP_ERR_INVALID_ARG;
@@ -295,7 +315,11 @@ extern "C" void app_main() {
                 peer.announcement.has_sync?"true":"false",peer.announcement.has_election?"true":"false");
         }
         diagnostic_printf("],\"selected_transmitter\":");
+#ifdef AIRBRIDGE_PRESENCE_TX
+        const auto* selected=sync_peer;
+#else
         const auto* selected=peers.select(own,std::uint64_t(now));
+#endif
         if(selected) print_mac(selected->announcement.source);else diagnostic_printf("null");
 #ifdef AIRBRIDGE_PRESENCE_TX
         diagnostic_printf(",\"presence_tx_admitted\":%u,\"presence_tx_rejected\":%u",presence_ok,presence_failed);

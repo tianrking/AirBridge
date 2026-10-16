@@ -93,18 +93,8 @@ impl Client {
         (client.events)(
             json!({"event":"connected","port":PORT,"usb_serial":USB_SERIAL,"capabilities":hello}),
         );
-        if hello["resolve"] == true {
-            if let Some(peer) = hello["paired_peer"]
-                .as_str()
-                .filter(|peer| protocol::mac(peer))
-            {
-                if let Err(error) = client.resolve(peer, 8770) {
-                    (client.events)(
-                        json!({"event":"resolution_error","mac":peer,"message":format!("{error:#}")}),
-                    );
-                }
-            }
-        }
+        // Connecting USB must not start a network operation or delay queued
+        // user commands. Resolve a currently advertised peer on selection.
         Ok(client)
     }
     fn request_body(&mut self, body: String, timeout: Duration) -> Result<Value> {
@@ -206,7 +196,7 @@ impl Client {
                 "scanner_status" => {
                     (self.events)(json!({"event":"peers","peers":event["peers"]}));
                 }
-                "peer_identity" | "outgoing_stage" | "outgoing_progress" => {
+                "peer_identity" | "outgoing_stage" | "outgoing_progress" | "resolve_stage" => {
                     (self.events)(event.clone());
                 }
                 _ => {}
