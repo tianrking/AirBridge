@@ -38,8 +38,8 @@ using Inflate = bool (*)(void*,Bytes,std::uint8_t*,std::size_t,std::size_t&);
 class DvZipReader {
 public:
     DvZipReader(CpioReader& archive,std::uint8_t* compressed,std::size_t capacity,
-        std::uint8_t* expanded,Inflate inflate,void* context=nullptr):
-        archive_(archive),compressed_(compressed),capacity_(capacity),expanded_(expanded),inflate_(inflate),context_(context){}
+        std::uint8_t* expanded,std::size_t expanded_capacity,Inflate inflate,void* context=nullptr):
+        archive_(archive),compressed_(compressed),capacity_(capacity),expanded_(expanded),expanded_capacity_(expanded_capacity),inflate_(inflate),context_(context){}
     Error feed(Bytes input);
     Error finish() const;
 private:
@@ -47,6 +47,7 @@ private:
     std::uint8_t* compressed_;
     std::size_t capacity_;
     std::uint8_t* expanded_;
+    std::size_t expanded_capacity_;
     Inflate inflate_;
     void* context_;
     std::array<std::uint8_t,4> header_{};

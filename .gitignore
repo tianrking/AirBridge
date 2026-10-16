@@ -12,3 +12,8 @@ dist/
 *.partial
 .env*
 received/
+__pycache__/
+*.pyc
+identity_credentials.hpp
+*.pem
+*.key

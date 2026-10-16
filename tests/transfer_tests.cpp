@@ -1,6 +1,9 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 #include "archive.hpp"
 #include "presence.hpp"
+#include "native_service.hpp"
+#include "ask_fixture.hpp"
+#include "serial_protocol.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -42,13 +45,20 @@ void archive_tests() {
     check(links.feed({symlink.data(),symlink.size()})==Error::unsupported,"symlinks are not extracted");
     std::vector<std::uint8_t> dvzip;check(write_dvzip_stored({archive.data(),archive.size()},emit,&dvzip)==Error::none && dvzip[0]==0x80 && dvzip[1]==1,"DvZip 65536-byte stored block has correct big-endian bit");
     std::vector<std::uint8_t> compressed(66560),expanded(65536);
-    Capture decoded;CpioReader cpio(sink(decoded));DvZipReader dv(cpio,compressed.data(),compressed.size(),expanded.data(),forbidden_inflate);
+    Capture decoded;CpioReader cpio(sink(decoded));DvZipReader dv(cpio,compressed.data(),compressed.size(),expanded.data(),expanded.size(),forbidden_inflate);
     bool good=true;for(std::size_t at=0;at<dvzip.size();at+=13) if(dv.feed({dvzip.data()+at,std::min(std::size_t{13},dvzip.size()-at)})!=Error::none) {good=false;break;}
     check(good && dv.finish()==Error::none && decoded.data==payload && decoded.ends==2,"fragmented DvZip stored blocks preserve archive");
-    Capture badout;CpioReader badcpio(sink(badout));DvZipReader bad(badcpio,compressed.data(),compressed.size(),expanded.data(),forbidden_inflate);
+    Capture badout;CpioReader badcpio(sink(badout));DvZipReader bad(badcpio,compressed.data(),compressed.size(),expanded.data(),expanded.size(),forbidden_inflate);
     const std::uint8_t huge[]{0xff,0xff,0xff,0xff};check(bad.feed({huge,4})==Error::malformed,"DvZip claimed size is bounded before copy");
-    Capture truncout;CpioReader trunccpio(sink(truncout));DvZipReader trunc(trunccpio,compressed.data(),compressed.size(),expanded.data(),forbidden_inflate);
+    Capture truncout;CpioReader trunccpio(sink(truncout));DvZipReader trunc(trunccpio,compressed.data(),compressed.size(),expanded.data(),expanded.size(),forbidden_inflate);
     check(trunc.feed({dvzip.data(),dvzip.size()-1})==Error::none && trunc.finish()==Error::truncated,"partial DvZip block cannot finish");
+    std::vector<std::uint8_t> big;const std::vector<std::uint8_t> raw128(131073,0xa5);
+    write_cpio_header("large.bin",unsigned(raw128.size()),emit,&big);big.insert(big.end(),raw128.begin(),raw128.end());write_cpio_trailer(emit,&big);
+    std::vector<std::uint8_t> apple{0x80,2,0,0};apple.insert(apple.end(),big.begin(),big.begin()+131072);
+    write_dvzip_stored({big.data()+131072,big.size()-131072},emit,&apple);
+    compressed.resize(263168);expanded.resize(262144);
+    Capture large;CpioReader lc(sink(large));DvZipReader ld(lc,compressed.data(),compressed.size(),expanded.data(),expanded.size(),forbidden_inflate);
+    check(ld.feed({apple.data(),apple.size()})==Error::none && ld.finish()==Error::none && large.data==raw128,"Apple-sized 128 KiB DvZip record is not limited to Linux writer's 64 KiB default");
     // Independent literal newc fixture: header, file name, padding, bytes, trailer.
     std::string raw="07070100000001000081A40000000000000000000000010000000000000003000000000000000000000000000000000000000200000000";
     check(raw.size()==110,"literal newc header length");
@@ -69,5 +79,49 @@ void aggregate_tests() {
     batch.count=9;aggregate.pop_back();check(parse_ipv6_batch({aggregate.data(),aggregate.size()},batch)==Error::truncated && batch.count==9,"truncated final aggregate cannot publish earlier subframe");
     aggregate[38]=0xff;aggregate[39]=0xff;check(parse_ipv6_batch({aggregate.data(),aggregate.size()},batch)==Error::truncated,"aggregate length cannot escape frame");
 }
+void native_tests() {
+    using namespace airbridge::native;
+    Request request{};
+    const std::string header="POST /Upload HTTP/1.1\r\nTransfer-Encoding: chunked\r\nContent-Type: application/x-dvzip\r\nTransferID: abc-123\r\nTotalBytes: 9\r\nExpect: 100-continue\r\n\r\n";
+    check(parse_request({reinterpret_cast<const std::uint8_t*>(header.data()),header.size()},request)==Error::none && request.chunked && request.expect_continue && request.total_bytes==9 && !std::strcmp(request.path.data(),"/Upload"),"literal native upload headers");
+    std::vector<std::uint8_t> output;BodyDecoder body(request,emit,&output);
+    const std::string wire="5\r\n0\r\n\r\n\r\n4;tag=ok\r\nABCD\r\n0\r\nChecksum: test\r\n\r\nNEXT";
+    std::size_t cursor=0;bool good=true;
+    while(cursor<wire.size() && !body.complete()) {std::size_t used=0;if(body.feed({reinterpret_cast<const std::uint8_t*>(wire.data()+cursor),1},used)!=Error::none || !used) {good=false;break;}cursor+=used;}
+    check(good && body.complete() && output==std::vector<std::uint8_t>{'0','\r','\n','\r','\n','A','B','C','D'} && wire.substr(cursor)=="NEXT","fragmented HTTP body and trailers leave pipelined bytes unconsumed");
+    const std::string mixed="POST /Ask HTTP/1.1\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\n\r\n";
+    check(parse_request({reinterpret_cast<const std::uint8_t*>(mixed.data()),mixed.size()},request)==Error::malformed,"HTTP request rejects conflicting lengths");
+    const std::string duplicate="POST /Ask HTTP/1.1\r\nContent-Length: 1\r\nContent-Length: 1\r\n\r\n";
+    check(parse_request({reinterpret_cast<const std::uint8_t*>(duplicate.data()),duplicate.size()},request)==Error::malformed,"duplicate request length rejects");
+    AskManifest ask{};check(parse_ask({ask_fixture.data(),ask_fixture.size()},ask)==Error::none && ask.count==2 && ask.total==131073 && !std::strcmp(ask.sender.data(),u8"测试 Mac") && !std::strcmp(ask.files[1].name.data(),u8"空.txt"),"Python plistlib Ask fixture preserves names, total and empty file");
+    check(!std::strcmp(ask.transfer_id.data(),"12345678-1234-4321-ABCD-0123456789AB"),"Ask reads nested TransferID id");
+    for(std::size_t n=0;n<40;n++) check(parse_ask({ask_fixture.data(),n},ask)!=Error::none,"short Ask cannot allocate files");
+    const airbridge::awdl::Mac mac{2,1,2,3,4,5};MdnsPacket announcement{};
+    check(mdns_announcement(mac,8770,0,announcement)==Error::none && announcement.size<512 && announcement.bytes[2]==0x84 && announcement.bytes[7]==4,"bounded mDNS announcement contains four answers");
+    const auto ip=airbridge::awdl::link_local(mac);check(std::equal(ip.begin(),ip.end(),announcement.bytes.begin()+std::ptrdiff_t(announcement.size-16)),"mDNS AAAA matches actual AWDL identity");
+    const std::uint8_t query[]{0,0,0,0,0,1,0,0,0,0,0,0,8,'_','a','i','r','d','r','o','p',4,'_','t','c','p',5,'l','o','c','a','l',0,0,12,0,1};
+    check(mdns_question({query,sizeof(query)},mac),"literal AirDrop PTR question matches");
+    std::vector<std::uint8_t> cycle{0,0,0,0,0,1,0,0,0,0,0,0,0xc0,12,0,12,0,1};
+    check(!mdns_question({cycle.data(),cycle.size()},mac),"DNS pointer cycle rejects");
 }
-unsigned transfer_checks() {archive_tests();aggregate_tests();return count;}
+void serial_tests() {
+    using namespace airbridge::serial;
+    const std::string checksum="123456789";
+    check(crc32({reinterpret_cast<const std::uint8_t*>(checksum.data()),checksum.size()})==0xcbf43926u,"IEEE CRC32 canonical vector");
+    const std::string literal="AB2 17 HELLO *414b814b\n";Command command{};
+    check(parse_command({reinterpret_cast<const std::uint8_t*>(literal.data()),literal.size()},command)==Error::none && command.sequence==17 && !std::strcmp(command.body.data(),"HELLO"),"Python zlib independently checks literal serial command");
+    const std::string crlf="AB2 18 DATA 0 YWJj *0d48aba4\r\n";
+    Command data{};check(parse_command({reinterpret_cast<const std::uint8_t*>(crlf.data()),crlf.size()},data)==Error::none && data.sequence==18,"UART CRLF and data payload");
+    for(std::size_t i=4;i<literal.size()-1;i++) {
+        auto corrupt=literal;corrupt[i]^=1;Command untouched{};untouched.sequence=99;
+        check(parse_command({reinterpret_cast<const std::uint8_t*>(corrupt.data()),corrupt.size()},untouched)!=Error::none && untouched.sequence==99,"corrupted serial frame cannot publish a command");
+    }
+    ReplayGuard guard;check(guard.check(command)==Replay::fresh,"first command is fresh");guard.remember(command);
+    check(guard.check(command)==Replay::repeat,"identical last command can replay acknowledgement");
+    auto collision=command;collision.body[0]='X';check(guard.check(collision)==Replay::conflict,"CRC equality alone cannot alias a different operation");
+    check(guard.check(data)==Replay::fresh,"higher sequence can execute once");guard.remember(data);
+    check(guard.check(command)==Replay::stale,"old commands cannot replay a mutation");
+    guard.reset();check(guard.check(command)==Replay::fresh,"explicit session reset permits fresh sequence");
+}
+}
+unsigned transfer_checks() {archive_tests();aggregate_tests();native_tests();serial_tests();return count;}

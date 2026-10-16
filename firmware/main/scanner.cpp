@@ -8,6 +8,11 @@
 #ifdef AIRBRIDGE_DISCOVER_PROBE
 #include "discovery_probe.hpp"
 #endif
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+#include "native_receiver.hpp"
+#include "ble_presence.hpp"
+#include "serial_channel.hpp"
+#endif
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -78,6 +83,9 @@ void print_string(const char* value) {
 }
 }
 extern "C" void app_main() {
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+    if(serial_channel_begin()!=ESP_OK) {std::puts("{\"event\":\"serial_driver_failed\"}");return;}
+#endif
 #ifdef AIRBRIDGE_PRESENCE_TX
     constexpr const char* receive_only="false";
 #else
@@ -90,6 +98,9 @@ extern "C" void app_main() {
     };
     if(!check(nvs_flash_init(),"nvs") || !check(esp_netif_init(),"netif") ||
        !check(esp_event_loop_create_default(),"events")) return;
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+    if(!check(ble_presence_begin(),"ble_presence")) return;
+#endif
     observations=xQueueCreate(16,sizeof(Observation));
     if(!observations) {std::puts("{\"event\":\"startup_failed\",\"stage\":\"queue\"}");return;}
     wifi_init_config_t config=WIFI_INIT_CONFIG_DEFAULT();
@@ -104,6 +115,8 @@ extern "C" void app_main() {
 #endif
     if(!check(esp_wifi_start(),"wifi_start") ||
        !check(esp_wifi_set_ps(WIFI_PS_NONE),"wifi_power_save") || !check(esp_wifi_set_channel(6,WIFI_SECOND_CHAN_NONE),"channel")) return;
+    std::int8_t power=0;esp_wifi_get_max_tx_power(&power);
+    std::printf("{\"event\":\"radio_power\",\"quarter_dbm_ceiling\":%d,\"calibration_mode\":%d}\n",int(power),CONFIG_ESP_PHY_CALIBRATION_MODE);
     wifi_promiscuous_filter_t filter{};filter.filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT;
 #ifdef AIRBRIDGE_IPV6_LINK
     filter.filter_mask|=WIFI_PROMIS_FILTER_MASK_DATA;
@@ -113,6 +126,10 @@ extern "C" void app_main() {
     Mac own{};esp_wifi_get_mac(WIFI_IF_STA,own.data());
 #ifdef AIRBRIDGE_IPV6_LINK
     if(!check(ipv6_link_begin(own),"awdl_netif")) return;
+#endif
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+    const Mac permitted_peer{AIRBRIDGE_PROBE_PEER_BYTES};
+    if(!check(native_receiver_begin(own,permitted_peer),"native_receiver")) return;
 #endif
     std::printf("{\"event\":\"scanner_ready\",\"channel\":6,\"native_transfer_verified\":false}\n");
     // The 12-row table must not consume the default 3584-byte app_main stack.
@@ -143,12 +160,22 @@ extern "C" void app_main() {
 #endif
 #ifdef AIRBRIDGE_DISCOVER_PROBE
         if(discovery_probe_poll(probe_result)) {
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+            const bool output_locked=serial_diagnostic_lock(5);
+            if(output_locked) {
+#endif
+            flockfile(stdout);
             std::printf("{\"event\":\"peer_identity\",\"mac\":");print_mac(probe_result.peer);
             std::printf(",\"display_name\":");print_string(probe_result.identity.name.data());
             std::printf(",\"model\":");print_string(probe_result.identity.model.data());
             std::printf(",\"name_source\":\"airdrop_discover\",\"http_status\":%u,\"error\":%d,\"stage\":",probe_result.http_status,probe_result.error);print_string(probe_result.stage.data());
             std::printf(",\"has_airdropable\":%s,\"airdropable\":%s}\n",probe_result.identity.has_airdropable?"true":"false",probe_result.identity.airdropable?"true":"false");
             if(!probe_result.error) probe_complete=true;
+            funlockfile(stdout);
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+                serial_diagnostic_unlock();
+            }
+#endif
         }
         if(!probe_complete && probe_attempts<3 && now>=next_probe) {
             for(const auto& peer:peers.rows()) if(peer.used && peer.announcement.source==probe_target && peer.announcement.service.airdrop && peer.announcement.service.port &&
@@ -176,6 +203,10 @@ extern "C" void app_main() {
 #endif
         if(now<next) continue;
         next=now+1'000'000;
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+        if(!serial_diagnostic_lock()) continue;
+#endif
+        flockfile(stdout);
 #ifdef AIRBRIDGE_SCAN_CAPTURE
         if(sample_state.load(std::memory_order_acquire)>=2) {
             std::printf("{\"event\":\"first_rejected_sample\",\"hex\":\"");
@@ -209,5 +240,9 @@ extern "C" void app_main() {
         std::printf(",\"ipv6_rx\":%u,\"ipv6_rx_dropped\":%u,\"ipv6_tx_queued\":%u,\"ipv6_tx_admitted\":%u,\"ipv6_tx_completed\":%u,\"ipv6_tx_failed\":%u,\"ipv6_inflight\":%u",link.rx,link.rx_dropped,link.tx_queued,link.tx_admitted,link.tx_completed,link.tx_failed,link.tx_inflight);
 #endif
         std::printf("}\n");std::fflush(stdout);
+        funlockfile(stdout);
+#ifdef AIRBRIDGE_NATIVE_SERVICE
+        serial_diagnostic_unlock();
+#endif
     }
 }

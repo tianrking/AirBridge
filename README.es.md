@@ -16,7 +16,7 @@ AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows medi
 
 ## Estado del proyecto
 
-Están implementados la decodificación acotada de A-MSDU y el análisis en flujo de DvZip/CPIO. Estas pruebas del analizador no validan la entrega nativa de archivos.
+Finder de macOS encontró **AirBridge PC** y envió a Windows un texto de 22.656 bytes con SHA256 coincidente. Un binario mayor fue rechazado por un salto de desplazamiento serie; la corrección del control de flujo aún necesita validación en hardware.
 
 | Función | Estado |
 | :--- | :--- |
@@ -24,7 +24,7 @@ Están implementados la decodificación acotada de A-MSDU y el análisis en fluj
 | Aceptación del vecino por Apple | Verificado en hardware |
 | IPv6 sobre AWDL | Verificado en hardware |
 | Nombres nativos de dispositivos | Verificados mediante TLS `/Discover` |
-| Archivos de Mac → Windows | Previsto |
+| Archivos de Mac → Windows | Texto de 22.656 bytes verificado |
 | Archivos de Windows → Mac | Aún no implementado |
 | Aplicación de escritorio | Tauri 2 · React · TypeScript · Rust — prevista |
 
@@ -40,7 +40,7 @@ Están implementados la decodificación acotada de A-MSDU y el análisis en fluj
 | Dispositivo Apple de validación | Mac con Wi-Fi y Bluetooth activados y AirDrop en Todos |
 | Herramientas del equipo | Python con pyserial; herramientas C++ de Visual Studio o CMake para las pruebas del protocolo |
 
-La plataforma de desarrollo incluye PSRAM para futuras transferencias. Esta revisión del escáner no necesita buffers de archivos para recepción.
+El receptor utiliza PSRAM para buffers acotados del archivo contenedor. Las revisiones anteriores de solo escaneo no necesitan esos buffers de recepción.
 
 ## Inicio rápido
 
@@ -48,12 +48,24 @@ La plataforma de desarrollo incluye PSRAM para futuras transferencias. Esta revi
 
 Active un entorno ESP-IDF 6.1, conecte la placa prevista y compruebe su identidad serie. Solo un proceso debe controlar el puerto.
 
+```powershell
+python -m pip install -r scripts/requirements.txt
+python -m serial.tools.list_ports -v
+```
+
+La CLI actual comprueba una placa de desarrollo concreta en **COM4**, incluido su número de serie USB. Revise la asociación en `scripts/receive-native.py` antes de adaptarla a otra placa.
+
 ### 2. Compilar el firmware
 
-El firmware predeterminado escucha en el canal 6 y emite observaciones JSON. Utilice primero el escáner para consultar los vecinos AWDL disponibles.
+Sustituya la MAC de ejemplo por la de un dispositivo AWDL de Apple recién observado que anuncie AirDrop. El receptor nativo permite actualmente ese dispositivo configurado de forma explícita.
 
 ```powershell
-idf.py -C firmware -B work/scanner build
+$peer = 'aa:bb:cc:dd:ee:ff'
+idf.py -C firmware -B work/native `
+  -D AIRBRIDGE_PRESENCE_TX=ON `
+  -D AIRBRIDGE_IPV6_LINK=ON `
+  -D AIRBRIDGE_NATIVE_SERVICE=ON `
+  -D "AIRBRIDGE_PROBE_PEER=$peer" build
 ```
 
 ### 3. Grabar la placa verificada
@@ -61,19 +73,31 @@ idf.py -C firmware -B work/scanner build
 La grabación sustituye la aplicación activa. Conserve una imagen funcional y compruebe primero la identidad de la placa. El proyecto reserva una aplicación de 2 MiB en `0x10000`, NVS en `0x9000` y datos PHY en `0xf000`; mantenga esta distribución al comparar firmware.
 
 ```powershell
-idf.py -C firmware -B work/scanner -p COM4 flash
+idf.py -C firmware -B work/native -p COM4 flash
 ```
 
-En esta revisión, el escáner y las sondas del protocolo son herramientas de desarrollo. Todavía no ofrecen recepción nativa de archivos.
+### 4. Iniciar el receptor de Windows
+
+```powershell
+python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 300
+```
+
+Mantenga la CLI abierta. Desbloquee el Mac, active Todos en AirDrop y comparta un archivo desde Finder con **AirBridge PC**. Compare el SHA256 de origen con el recibo y con el archivo real de Windows. Cierre cualquier diálogo antiguo de Waiting antes de reintentar.
+
+Cada bloque serie requiere confirmación. Windows verifica tamaños y SHA256, sincroniza los archivos con el disco y publica el directorio temporal antes de confirmar la transferencia. Los recibos se guardan junto a los directorios completos; los datos `.partial` fallidos se conservan para diagnóstico.
 
 ## Verificación
 
-**Comprobaciones del protocolo portátil: 198.**
+**Comprobaciones del protocolo portátil: 276.** **Pruebas del receptor de Windows: 11.**
 
-Las pruebas portátiles cubren tramas malformadas, límites, sincronización y datos del protocolo. Las evidencias de hardware se registran por separado cuando están disponibles.
+Las pruebas portátiles cubren tramas malformadas, límites, sincronización y datos del protocolo. Las pruebas del equipo comprueban fallos de desplazamiento, hash y publicación duradera. Las evidencias de hardware se registran por separado.
 
 ```powershell
 cmd /c scripts\test-native.cmd
+```
+
+```powershell
+python -m unittest discover -s tests -p test_receiver.py -q
 ```
 
 ## Arquitectura
@@ -106,6 +130,7 @@ La MAC AWDL, la instancia DNS, la etiqueta del host y el nombre de AirDrop son i
 - [Intercambio de datos IPv6](docs/ipv6-qualification.md)
 - [Nombres nativos mediante Discover](docs/discover-qualification.md)
 - [Núcleo de archivos en flujo](docs/transfer-core.md)
+- [Recepción nativa y hashes](docs/native-receiving.md)
 
 ## Próximos pasos
 

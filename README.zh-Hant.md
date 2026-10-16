@@ -16,7 +16,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 ## 專案狀態
 
-已實作有界 A-MSDU 解碼與 DvZip／CPIO 串流解析。解析器檢查不代表原生檔案傳輸已通過驗收。
+macOS Finder 已找到 **AirBridge PC**，並將 22,656 位元組文字檔傳至 Windows，雙方 SHA256 一致。較大的二進位檔曾因序列埠偏移檢查失敗而被拒絕；逐區塊確認修正仍待實機驗收。
 
 | 功能 | 狀態 |
 | :--- | :--- |
@@ -24,7 +24,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 | Apple 鄰居接納 | 已通過實機驗證 |
 | AWDL 上的 IPv6 | 已通過實機驗證 |
 | 原生裝置名稱 | 已透過 TLS `/Discover` 驗證 |
-| Mac → Windows 檔案接收 | 規劃中 |
+| Mac → Windows 檔案接收 | 已驗證 22,656 位元組文字檔 |
 | Windows → Mac 檔案傳送 | 尚未實作 |
 | 桌面應用程式 | Tauri 2 · React · TypeScript · Rust — 規劃中 |
 
@@ -40,7 +40,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 | Apple 驗收目標 | 啟用 Wi-Fi 與藍牙，並將 AirDrop 設為所有人的 Mac |
 | 主機工具 | Python 與 pyserial；協定檢查使用 Visual Studio C++ 工具或 CMake |
 
-開發目標包含 PSRAM，供後續傳輸功能使用；此掃描版本不需要接收服務的封存緩衝區。
+接收服務使用 PSRAM 配置有界封存資料緩衝區；較早的純掃描版本不需要這些接收緩衝區。
 
 ## 快速開始
 
@@ -48,12 +48,24 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 啟用 ESP-IDF 6.1 環境，連接指定開發板並核對序列埠身分；同一時間僅讓一個程序使用該連接埠。
 
+```powershell
+python -m pip install -r scripts/requirements.txt
+python -m serial.tools.list_ports -v
+```
+
+目前主機 CLI 會核對 **COM4** 上指定開發板的 USB 序號。移植到其他開發板前，請檢閱 `scripts/receive-native.py` 的裝置綁定設定。
+
 ### 2. 建置韌體
 
-預設韌體監聽信道 6，並輸出 JSON 觀測資料。請先使用掃描器檢查可用的 AWDL 鄰居。
+請將範例 MAC 換成掃描器剛取得、正在公告 AirDrop 的 Apple AWDL 裝置位址。目前原生接收服務僅允許此明確指定的對端。
 
 ```powershell
-idf.py -C firmware -B work/scanner build
+$peer = 'aa:bb:cc:dd:ee:ff'
+idf.py -C firmware -B work/native `
+  -D AIRBRIDGE_PRESENCE_TX=ON `
+  -D AIRBRIDGE_IPV6_LINK=ON `
+  -D AIRBRIDGE_NATIVE_SERVICE=ON `
+  -D "AIRBRIDGE_PROBE_PEER=$peer" build
 ```
 
 ### 3. 燒錄已核對的開發板
@@ -61,19 +73,31 @@ idf.py -C firmware -B work/scanner build
 燒錄會取代目前應用程式，請先保留可用映像並核對開發板身分。專案在 `0x10000` 配置 2 MiB 應用程式分割區，NVS 位於 `0x9000`，PHY 資料位於 `0xf000`；韌體對照時請維持此配置。
 
 ```powershell
-idf.py -C firmware -B work/scanner -p COM4 flash
+idf.py -C firmware -B work/native -p COM4 flash
 ```
 
-此版本的掃描器與協定探測屬於開發工具，尚未提供原生檔案接收服務。
+### 4. 啟動 Windows 接收端
+
+```powershell
+python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 300
+```
+
+保持 CLI 執行。將 Mac 解鎖並把 AirDrop 設為所有人，從 Finder 分享檔案至 **AirBridge PC**，再比對來源 SHA256、接收紀錄與 Windows 實際檔案。重試前請關閉舊的 Waiting 分享視窗。
+
+每個序列資料區塊都必須獲得確認。Windows 會檢查大小與 SHA256、寫入磁碟並發佈暫存目錄後，才確認傳輸。接收紀錄存於完成目錄旁；失敗的 `.partial` 資料保留供診斷。
 
 ## 驗證
 
-**可攜式協定檢查: 198.**
+**可攜式協定檢查: 276.** **Windows 接收端測試: 11.**
 
-可攜式測試涵蓋畸形封包、邊界、同步與協定線格式；實機證據會於取得後另行記錄。
+可攜式測試涵蓋畸形封包、邊界、同步與協定線格式；主機測試檢查偏移、雜湊與可靠落盤的失敗情況。實機證據另行記錄。
 
 ```powershell
 cmd /c scripts\test-native.cmd
+```
+
+```powershell
+python -m unittest discover -s tests -p test_receiver.py -q
 ```
 
 ## 系統架構
@@ -106,6 +130,7 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 - [IPv6 資料往返](docs/ipv6-qualification.md)
 - [Discover 原生名稱](docs/discover-qualification.md)
 - [串流封存核心](docs/transfer-core.md)
+- [原生接收與檔案雜湊](docs/native-receiving.md)
 
 ## 後續規劃
 

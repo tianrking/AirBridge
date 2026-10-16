@@ -121,14 +121,14 @@ Error DvZipReader::feed(Bytes input) {
             if(have_<4) continue;
             const std::uint32_t raw=(std::uint32_t(header_[0])<<24)|(std::uint32_t(header_[1])<<16)|(std::uint32_t(header_[2])<<8)|header_[3];
             stored_=bool(raw&0x80000000u);length_=raw&0x7fffffffu;used_=0;
-            if(!length_ || length_>capacity_ || (stored_ && length_>65536) || !compressed_) return fail(Error::malformed);
+            if(!length_ || length_>capacity_ || length_>263168 || (stored_ && length_>262144) || !compressed_) return fail(Error::malformed);
         }
         const auto count=std::min(length_-used_,input.size-cursor);
         std::memcpy(compressed_+used_,input.data+cursor,count);used_+=count;cursor+=count;
         if(used_<length_) continue;
         Bytes decoded{compressed_,length_};std::size_t expanded=0;
         if(!stored_) {
-            if(!expanded_ || !inflate_ || !inflate_(context_,decoded,expanded_,65536,expanded) || !expanded || expanded>65536) return fail(Error::malformed);
+            if(!expanded_ || !expanded_capacity_ || expanded_capacity_>262144 || !inflate_ || !inflate_(context_,decoded,expanded_,expanded_capacity_,expanded) || !expanded || expanded>expanded_capacity_) return fail(Error::malformed);
             decoded={expanded_,expanded};
         }
         const auto error=archive_.feed(decoded);if(error!=Error::none) return fail(error);

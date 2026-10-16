@@ -1,5 +1,6 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 #include "discover.hpp"
+#include "native_service.hpp"
 #include <algorithm>
 #include <cstring>
 
@@ -54,6 +55,24 @@ struct Reader {
         }
         output[used]=0;return true;
     }
+    bool lookup(std::uint64_t id,const char* key,std::uint64_t& result,bool& present) const {
+        std::size_t at=0;std::uint64_t fields=0;present=false;
+        if(!object(id,at) || (data[at]&0xf0)!=0xd0 || !length(at,fields) || fields>(table-at)/(2*refs)) return false;
+        for(std::uint64_t i=0;i<fields;i++) {
+            std::array<char,256> name{};
+            if(!string(big(data+at+std::size_t(i)*refs,refs),name.data(),name.size())) return false;
+            if(std::strcmp(key,name.data())) continue;
+            if(present) return false;
+            present=true;result=big(data+at+std::size_t(fields+i)*refs,refs);
+            if(result>=count) return false;
+        }
+        return true;
+    }
+    bool integer(std::uint64_t id,std::uint32_t& result) const {
+        std::size_t at=0;if(!object(id,at) || (data[at]&0xf0)!=0x10 || (data[at]&15)>3) return false;
+        const unsigned bytes=1u<<(data[at++]&15);if(bytes>table-at) return false;
+        const auto value=big(data+at,bytes);if(value>0xffffffffu) return false;result=std::uint32_t(value);return true;
+    }
 };
 }
 
@@ -100,3 +119,37 @@ std::array<std::uint8_t,72> discover_request(std::uint32_t support_flags) {
     return output;
 }
 } // namespace airbridge::discovery
+
+namespace airbridge::native {
+Error parse_ask(Bytes body,AskManifest& output) {
+    using namespace discovery;
+    if(!body.data || body.size<40) return Error::truncated;
+    if(std::memcmp(body.data,"bplist00",8)) return Error::unsupported;
+    const auto* trailer=body.data+body.size-32;const unsigned offsets=trailer[6],refs=trailer[7];
+    const auto count=big(trailer+8,8),root=big(trailer+16,8),table=big(trailer+24,8);
+    if(!offsets || offsets>8 || !refs || refs>8 || !count || count>4096 || root>=count || table<8 || table>body.size-32 || count>(body.size-32-table)/offsets) return Error::malformed;
+    Reader reader{body.data,std::size_t(table),offsets,refs,count};AskManifest result{};
+    std::uint64_t value=0,id=0;bool found=false;
+    if(!reader.lookup(root,"TransferID",value,found) || !found || !reader.lookup(value,"id",id,found) || !found ||
+       !reader.string(id,result.transfer_id.data(),result.transfer_id.size())) return Error::malformed;
+    for(char c:result.transfer_id) {
+        if(!c) break;
+        if(!((c>='0' && c<='9') || (c>='a' && c<='z') || (c>='A' && c<='Z') || c=='-')) return Error::malformed;
+    }
+    if(!*result.transfer_id.data()) return Error::malformed;
+    if(!reader.lookup(root,"SenderComputerName",value,found) || (found && !reader.string(value,result.sender.data(),result.sender.size()))) return Error::malformed;
+    if(!reader.lookup(root,"Files",value,found) || !found) return Error::unsupported;
+    std::size_t at=0;std::uint64_t entries=0;
+    if(!reader.object(value,at) || (body.data[at]&0xf0)!=0xa0 || !reader.length(at,entries) || !entries || entries>result.files.size() || entries>(reader.table-at)/refs) return Error::unsupported;
+    for(std::uint64_t i=0;i<entries;i++) {
+        const auto entry=big(body.data+at+std::size_t(i)*refs,refs);auto& file=result.files[std::size_t(i)];
+        if(!reader.lookup(entry,"FileName",value,found) || !found || !reader.string(value,file.name.data(),file.name.size()) ||
+           !transfer::safe_filename(file.name.data()) || !reader.lookup(entry,"FileSize",value,found) || !found || !reader.integer(value,file.size)) return Error::malformed;
+        if(!reader.lookup(entry,"FileIsDirectory",value,found)) return Error::malformed;
+        if(found) {std::size_t flag=0;if(!reader.object(value,flag) || body.data[flag]!=8) return Error::unsupported;}
+        for(std::uint64_t prior=0;prior<i;prior++) if(!std::strcmp(result.files[std::size_t(prior)].name.data(),file.name.data())) return Error::duplicate;
+        result.total+=file.size;if(result.total>64u*1024*1024) return Error::unsupported;
+    }
+    result.count=unsigned(entries);output=result;return Error::none;
+}
+}

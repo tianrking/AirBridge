@@ -16,7 +16,7 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-Bounded A-MSDU decoding and streaming DvZip/CPIO parsing are implemented. These parser checks do not qualify native file delivery.
+macOS Finder discovered **AirBridge PC** and sent a 22,656-byte text file to Windows with matching SHA256. A larger binary attempt failed serial offset validation; the backpressure repair still needs hardware acceptance.
 
 | Capability | Status |
 | :--- | :--- |
@@ -24,7 +24,7 @@ Bounded A-MSDU decoding and streaming DvZip/CPIO parsing are implemented. These 
 | Apple peer admission | Hardware verified |
 | IPv6 over AWDL | Hardware verified |
 | Native device names | Verified through TLS `/Discover` |
-| Mac → Windows files | Planned |
+| Mac → Windows files | 22,656-byte text verified |
 | Windows → Mac files | Not yet implemented |
 | Desktop application | Tauri 2 · React · TypeScript · Rust — planned |
 
@@ -40,7 +40,7 @@ Bounded A-MSDU decoding and streaming DvZip/CPIO parsing are implemented. These 
 | Apple acceptance target | A Mac with Wi-Fi and Bluetooth enabled; AirDrop set to Everyone |
 | Host tools | Python with pyserial; Visual Studio C++ tools or CMake for protocol checks |
 
-PSRAM is part of the development target for later transfer work. This scanner revision does not need receive-service archive buffers.
+The receiver uses PSRAM for bounded archive buffers. Earlier scanner-only revisions do not require those receive buffers.
 
 ## Quick start
 
@@ -48,12 +48,24 @@ PSRAM is part of the development target for later transfer work. This scanner re
 
 Activate an ESP-IDF 6.1 environment, connect the intended board and inspect its serial identity. Use one process to own the port.
 
+```powershell
+python -m pip install -r scripts/requirements.txt
+python -m serial.tools.list_ports -v
+```
+
+The current host CLI validates one development board on **COM4**, including its USB serial. Review the binding in `scripts/receive-native.py` before adapting it to another board.
+
 ### 2. Build the firmware
 
-The default firmware listens on channel 6 and emits JSON observations. Start with the scanner to inspect available AWDL peers.
+Replace the example MAC with a fresh, advertised Apple AWDL peer from the scanner. The native receiver currently permits that explicitly configured peer.
 
 ```powershell
-idf.py -C firmware -B work/scanner build
+$peer = 'aa:bb:cc:dd:ee:ff'
+idf.py -C firmware -B work/native `
+  -D AIRBRIDGE_PRESENCE_TX=ON `
+  -D AIRBRIDGE_IPV6_LINK=ON `
+  -D AIRBRIDGE_NATIVE_SERVICE=ON `
+  -D "AIRBRIDGE_PROBE_PEER=$peer" build
 ```
 
 ### 3. Flash the verified board
@@ -61,19 +73,31 @@ idf.py -C firmware -B work/scanner build
 Flashing replaces the active application. Preserve a working image and confirm the board identity first. The project reserves a 2 MiB application at `0x10000`, NVS at `0x9000` and PHY data at `0xf000`; keep that layout when comparing firmware.
 
 ```powershell
-idf.py -C firmware -B work/scanner -p COM4 flash
+idf.py -C firmware -B work/native -p COM4 flash
 ```
 
-At this revision, the scanner and protocol probes are development tools. They do not provide a native file receive service.
+### 4. Start the Windows receiver
+
+```powershell
+python scripts/receive-native.py --directory received/inbox --log work/receive.jsonl --seconds 300
+```
+
+Keep the CLI running. Unlock the Mac, enable Everyone in AirDrop, then share a file from Finder to **AirBridge PC**. Compare the source SHA256 with the receipt and the actual Windows file. Close any old Waiting dialog before retrying.
+
+Each serial chunk must be acknowledged. Windows checks sizes and SHA256, flushes files and publishes the temporary directory before confirming the transfer. Receipts sit beside completed directories; failed `.partial` output is retained for diagnosis.
 
 ## Verification
 
-**Portable protocol assertions: 198.**
+**Portable protocol assertions: 276.** **Windows receiver tests: 11.**
 
-The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Hardware evidence is recorded separately as it becomes available.
+The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Host tests exercise offset, digest and durable-publication failures. Hardware evidence is recorded separately.
 
 ```powershell
 cmd /c scripts\test-native.cmd
+```
+
+```powershell
+python -m unittest discover -s tests -p test_receiver.py -q
 ```
 
 ## Architecture
@@ -106,6 +130,7 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 - [IPv6 payload roundtrip](docs/ipv6-qualification.md)
 - [Native names through Discover](docs/discover-qualification.md)
 - [Streaming archive core](docs/transfer-core.md)
+- [Native receiving and file hashes](docs/native-receiving.md)
 
 ## Roadmap
 

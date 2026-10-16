@@ -13,11 +13,12 @@ that the firmware has qualified transfer at those sizes.
 
 DvZip framing is incremental across arbitrary transport chunks. Stored blocks
 are emitted independently; compressed blocks are passed to a bounded platform
-inflater with a 64 KiB output limit. The receiver must retain temporary files
+inflater with a 256 KiB output limit, including Apple's observed 128 KiB blocks. The receiver must retain temporary files
 until HTTP framing, DvZip and CPIO finish successfully; the end of an individual
 file is not sufficient to publish a completed transfer.
 
-Native MSVC verification: 198 checks, including literal newc bytes, fragmented
+Native MSVC verification: 276 checks, including literal newc bytes, fragmented
 odc/DvZip, binary data, malicious names and aggregate truncation. Compressed
-inflation and Apple file transfer still require the platform/hardware acceptance
-test. This commit alone does not qualify native file delivery.
+inflation is supplied by the platform ROM. Native file acceptance is documented
+separately in [native receiving](native-receiving.md); parser limits do not qualify
+transfers at the maximum allowed sizes.
