@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "date": "2026-10-16",
+  "author": {
+    "name": "tianrking",
+    "email": "10758833+tianrking@users.noreply.github.com"
+  },
+  "scope": "New AWDL scanner and management presence only",
+  "native_airdrop_transfer_verified": false,
+  "native_awdl_peer_presence_verified": true,
+  "native_protocol_checks": 117,
+  "idf": "6.1",
+  "chip": "ESP32-S3",
+  "usb_port": "COM4",
+  "usb_serial": "F0:9E:9E:1E:61:3C",
+  "own_experimental_radio_mac": "ba:1a:dd:47:3b:3e",
+  "interface": "unassociated STA",
+  "channel": 6,
+  "raw_rate_mbps": 6,
+  "application_sha256": "2d6eec7e550d8def029e9c734ee47fde916dd4457276d8f066e94b729db98eb7",
+  "bounded_observation_seconds": 25,
+  "received_action_frames": 418,
+  "rejected_malformed_frames": 3,
+  "rx_queue_drops": 0,
+  "observed_neighbors": 3,
+  "observed_airdrop_advertisements": 2,
+  "observed_airdrop_port": 8770,
+  "driver_presence_admitted": 888,
+  "driver_presence_rejected": 0,
+  "mac_confirmation": {
+    "timestamp_local": "2026-10-16 15:33:34.429 Asia/Shanghai",
+    "kernel_event": "Posted Peer Presence",
+    "interface": "awdl0",
+    "absence_observed_after_diagnostic_and_restore": true
+  },
+  "known_working_firmware_restored": true,
+  "limitations": [
+    "No IPv6 exchange qualification in this implementation",
+    "No TLS or Discover qualification in this implementation",
+    "No native file transfer qualification in this implementation",
+    "AWDL host labels are UUIDs, not AirDrop display names",
+    "No GUI qualification",
+    "Private frames and Mac logs excluded"
+  ]
+}

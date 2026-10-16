@@ -1,3 +1,13 @@
-idf_component_register(SRCS "scanner.cpp" "../../core/awdl.cpp"
+idf_component_register(SRCS "scanner.cpp" "../../core/awdl.cpp" "../../core/discovery.cpp" "../../core/presence.cpp"
   INCLUDE_DIRS "../../core" REQUIRES esp_wifi esp_event esp_netif nvs_flash esp_timer)
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)
+option(AIRBRIDGE_SCAN_CAPTURE "Include one rejected raw frame in diagnostic output" OFF)
+if(AIRBRIDGE_SCAN_CAPTURE)
+  target_compile_definitions(${COMPONENT_LIB} PRIVATE AIRBRIDGE_SCAN_CAPTURE=1)
+endif()
+option(AIRBRIDGE_PRESENCE_TX "Transmit bounded own-identity AWDL presence frames" OFF)
+if(AIRBRIDGE_PRESENCE_TX)
+  target_sources(${COMPONENT_LIB} PRIVATE "tx_guard.cpp")
+  target_compile_definitions(${COMPONENT_LIB} PRIVATE AIRBRIDGE_PRESENCE_TX=1)
+  target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,-z,muldefs")
+endif()

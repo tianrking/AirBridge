@@ -48,7 +48,7 @@ Error parse_announcement(Bytes frame,Announcement& output) {
     if(!unicast(draft.source)) return Error::malformed;
     draft.kind=bytes[30];draft.sender_timestamp=le32(bytes+36);
     std::size_t cursor=40;
-    bool seen_version=false,seen_legacy=false;
+    bool seen_version=false,seen_legacy=false,explicit_channels_seen=false;
     while(cursor<frame.size) {
         if(frame.size-cursor<3) {
             for(std::size_t i=cursor;i<frame.size;i++) if(bytes[i]) return Error::truncated;
@@ -59,6 +59,18 @@ Error parse_announcement(Bytes frame,Announcement& output) {
         if(length>frame.size-cursor) return Error::truncated;
         const auto* p=bytes+cursor;
         switch(tag) {
+        case 2: {
+            ServiceOffer offer{};auto result=parse_service_record({p,length},offer);
+            if(result==Error::unsupported) break;
+            if(result!=Error::none) return result;
+            if(offer.airdrop) {
+                if(draft.service.airdrop && draft.service.instance!=offer.instance) break;
+                if(draft.service.port && offer.port && draft.service.port!=offer.port) return Error::malformed;
+                if(!offer.port) offer.port=draft.service.port;
+                draft.service=offer;
+            }
+            break;
+        }
         case 4:
             if(draft.has_sync) return Error::duplicate;
             if(length<33) return Error::truncated;
@@ -84,11 +96,13 @@ Error parse_announcement(Bytes frame,Announcement& output) {
             }
             break;
         case 18: {
-            // A channel plan embedded in sync and its explicit TLV may agree.
+            // Prefer the explicit plan. Apple's embedded legacy plan can use a
+            // 5 GHz center channel while the opclass plan names the primary.
             ChannelPlan plan{};auto result=channels({p,length},plan);
             if(result!=Error::none) return result;
-            if(draft.has_channels && draft.channels.channel!=plan.channel) return Error::malformed;
+            if(explicit_channels_seen && draft.channels.channel!=plan.channel) return Error::malformed;
             draft.channels=plan;draft.has_channels=true;
+            explicit_channels_seen=true;
             break;
         }
         case 24:
@@ -175,9 +189,11 @@ void PeerTable::update(const Announcement& update,std::int8_t rssi,std::uint64_t
         if(!merged.has_election && old.has_election) {merged.election=old.election;merged.has_election=true;}
         if(!merged.has_channels && old.has_channels) {merged.channels=old.channels;merged.has_channels=true;}
         if(!merged.has_hostname && old.has_hostname) {merged.hostname=old.hostname;merged.has_hostname=true;}
+        if(!merged.service.airdrop && old.service.airdrop) merged.service=old.service;
     }
     const auto sync_time=update.has_sync ? now : row->sync_received_us;
-    *row={merged,now,sync_time,rssi,true};
+    const auto service_time=update.service.airdrop ? now : row->service_received_us;
+    *row={merged,now,sync_time,service_time,rssi,true};
 }
 const Peer* PeerTable::select(const Mac& self,std::uint64_t now) const {
     const Peer* best=nullptr;

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 // Receive-only protocol qualification image. No AWDL presence or file service.
 #include "awdl.hpp"
+#include "presence.hpp"
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -11,12 +12,22 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include <atomic>
+#include <algorithm>
 #include <cstdio>
 using namespace airbridge::awdl;
+#ifdef AIRBRIDGE_PRESENCE_TX
+extern "C" void airbridge_set_tx_identity(const std::uint8_t* address);
+#endif
 namespace {
 struct Observation {Announcement announcement;std::uint64_t received;std::int8_t rssi;};
 QueueHandle_t observations;
 std::atomic<unsigned> accepted{},malformed{},queue_full{};
+std::array<std::atomic<unsigned>,6> failures{};
+#ifdef AIRBRIDGE_SCAN_CAPTURE
+std::atomic<unsigned> sample_state{};
+std::array<std::uint8_t,512> sample{};
+std::size_t sample_length{};
+#endif
 void on_frame(void* buffer,wifi_promiscuous_pkt_type_t type) {
     if(type!=WIFI_PKT_MGMT || !buffer) return;
     const auto* packet=static_cast<const wifi_promiscuous_pkt_t*>(buffer);
@@ -24,7 +35,18 @@ void on_frame(void* buffer,wifi_promiscuous_pkt_type_t type) {
     Observation observation{};
     const auto result=parse_announcement({packet->payload,std::size_t(packet->rx_ctrl.sig_len)-4},observation.announcement);
     if(result==Error::not_awdl) return;
-    if(result!=Error::none) {++malformed;return;}
+    if(result!=Error::none) {
+        ++malformed;++failures[static_cast<unsigned>(result)];
+#ifdef AIRBRIDGE_SCAN_CAPTURE
+        unsigned empty=0;
+        if(sample_state.compare_exchange_strong(empty,1)) {
+            sample_length=std::min(std::size_t(packet->rx_ctrl.sig_len)-4,sample.size());
+            std::copy_n(packet->payload,sample_length,sample.begin());
+            sample_state.store(2,std::memory_order_release);
+        }
+#endif
+        return;
+    }
     observation.received=std::uint64_t(esp_timer_get_time());observation.rssi=packet->rx_ctrl.rssi;
     if(xQueueSend(observations,&observation,0)==pdTRUE) ++accepted;else ++queue_full;
 }
@@ -41,7 +63,12 @@ void print_string(const char* value) {
 }
 }
 extern "C" void app_main() {
-    std::printf("{\"event\":\"qualification_boot\",\"receive_only\":true,\"native_transfer_verified\":false,\"reset_reason\":%d}\n",esp_reset_reason());
+#ifdef AIRBRIDGE_PRESENCE_TX
+    constexpr const char* receive_only="false";
+#else
+    constexpr const char* receive_only="true";
+#endif
+    std::printf("{\"event\":\"qualification_boot\",\"receive_only\":%s,\"native_transfer_verified\":false,\"reset_reason\":%d}\n",receive_only,esp_reset_reason());
     auto check=[](esp_err_t error,const char* stage) {
         if(error!=ESP_OK) {std::printf("{\"event\":\"startup_failed\",\"stage\":\"%s\",\"code\":%d}\n",stage,int(error));return false;}
         return true;
@@ -52,27 +79,75 @@ extern "C" void app_main() {
     if(!observations) {std::puts("{\"event\":\"startup_failed\",\"stage\":\"queue\"}");return;}
     wifi_init_config_t config=WIFI_INIT_CONFIG_DEFAULT();
     if(!check(esp_wifi_init(&config),"wifi_init") || !check(esp_wifi_set_storage(WIFI_STORAGE_RAM),"wifi_storage") ||
-       !check(esp_wifi_set_mode(WIFI_MODE_STA),"wifi_mode") || !check(esp_wifi_start(),"wifi_start") ||
+       !check(esp_wifi_set_mode(WIFI_MODE_STA),"wifi_mode")) return;
+#ifdef AIRBRIDGE_PRESENCE_TX
+    // Retain this board's already assigned experimental identity for comparison.
+    const Mac identity{0xba,0x1a,0xdd,0x47,0x3b,0x3e};
+    if(!check(esp_wifi_set_mac(WIFI_IF_STA,identity.data()),"radio_identity") ||
+       !check(esp_wifi_config_80211_tx_rate(WIFI_IF_STA,WIFI_PHY_RATE_6M),"raw_rate")) return;
+    airbridge_set_tx_identity(identity.data());
+#endif
+    if(!check(esp_wifi_start(),"wifi_start") ||
        !check(esp_wifi_set_ps(WIFI_PS_NONE),"wifi_power_save") || !check(esp_wifi_set_channel(6,WIFI_SECOND_CHAN_NONE),"channel")) return;
     wifi_promiscuous_filter_t filter{};filter.filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT;
     if(!check(esp_wifi_set_promiscuous_filter(&filter),"filter") || !check(esp_wifi_set_promiscuous_rx_cb(on_frame),"callback") ||
        !check(esp_wifi_set_promiscuous(true),"monitor")) return;
     Mac own{};esp_wifi_get_mac(WIFI_IF_STA,own.data());
     std::printf("{\"event\":\"scanner_ready\",\"channel\":6,\"native_transfer_verified\":false}\n");
-    PeerTable peers;std::int64_t next=0;Observation observation{};
+    // The 12-row table must not consume the default 3584-byte app_main stack.
+    static PeerTable peers;
+    static Observation observation{};
+    std::int64_t next=0;
+#ifdef AIRBRIDGE_PRESENCE_TX
+    static Presence presence{};
+    static ManagementFrame frame{};
+    presence.source=own;presence.destination.fill(255);presence.root=presence.parent=own;
+    std::copy_n("airbridge-native",16,presence.host_label.begin());
+    presence.advertised.channel.fill(6);presence.advertised.slot_aw_count=4;
+    presence.self_metric=presence.root_metric=32;presence.self_counter=presence.root_counter=1;
+    presence.clock.observe({own,64,0,16,4},std::uint64_t(esp_timer_get_time()));
+    std::int64_t next_presence=0;std::uint16_t sequence=0;unsigned presence_ok=0,presence_failed=0;
+#endif
     for(;;) {
-        if(xQueueReceive(observations,&observation,pdMS_TO_TICKS(100))==pdTRUE)
+        if(xQueueReceive(observations,&observation,pdMS_TO_TICKS(5))==pdTRUE && observation.announcement.source!=own)
             peers.update(observation.announcement,observation.rssi,observation.received);
         const auto now=esp_timer_get_time();
+#ifdef AIRBRIDGE_PRESENCE_TX
+        if(const auto* selected=peers.select(own,std::uint64_t(now))) {
+            const auto& info=selected->announcement;
+            presence.root=info.election.root;presence.parent=info.source;presence.depth=info.election.depth+1;
+            presence.root_metric=info.election.root_metric;presence.root_counter=info.election.root_counter;
+            presence.clock.observe(info.sync,selected->sync_received_us);
+        }
+        if(now>=next_presence) {
+            next_presence=now+55'000;
+            for(const auto kind: {0,3}) {
+                const auto encoded=encode_presence(presence,std::uint8_t(kind),sequence++,std::uint64_t(now),frame);
+                const auto sent=encoded==Error::none ? esp_wifi_80211_tx(WIFI_IF_STA,frame.bytes.data(),int(frame.length),true) : ESP_ERR_INVALID_ARG;
+                if(sent==ESP_OK) ++presence_ok;else ++presence_failed;
+            }
+        }
+#endif
         if(now<next) continue;
         next=now+1'000'000;
+#ifdef AIRBRIDGE_SCAN_CAPTURE
+        if(sample_state.load(std::memory_order_acquire)>=2) {
+            std::printf("{\"event\":\"first_rejected_sample\",\"hex\":\"");
+            for(std::size_t i=0;i<sample_length;i++) std::printf("%02x",sample[i]);
+            std::printf("\"}\n");sample_state.store(3);
+        }
+#endif
+        std::printf("{\"event\":\"decode_errors\",\"truncated\":%u,\"malformed\":%u,\"unsupported\":%u,\"duplicate\":%u}\n",failures[2].load(),failures[3].load(),failures[4].load(),failures[5].load());
         std::printf("{\"event\":\"scanner_status\",\"accepted\":%u,\"malformed\":%u,\"queue_full\":%u,\"peers\":[",accepted.load(),malformed.load(),queue_full.load());
         bool comma=false;
         for(const auto& peer:peers.rows()) {
             if(!peer.used || std::uint64_t(now)<peer.seen_us || std::uint64_t(now)-peer.seen_us>10'000'000) continue;
-            if(comma) std::putchar(',');comma=true;
+            if(comma) std::putchar(',');
+            comma=true;
             std::printf("{\"mac\":");print_mac(peer.announcement.source);
             std::printf(",\"rssi\":%d,\"host_label\":",int(peer.rssi));print_string(peer.announcement.hostname.data());
+            std::printf(",\"airdrop_advertised\":%s,\"airdrop_port\":%u,\"service_instance\":",peer.announcement.service.airdrop?"true":"false",peer.announcement.service.port);
+            print_string(peer.announcement.service.instance.data());
             std::printf(",\"name_source\":\"awdl_arpa\",\"channel6_mask\":%u,\"root_metric\":%lu,\"has_sync\":%s,\"has_election\":%s}",
                 peer.announcement.channels.mask(6),static_cast<unsigned long>(peer.announcement.election.root_metric),
                 peer.announcement.has_sync?"true":"false",peer.announcement.has_election?"true":"false");
@@ -80,6 +155,9 @@ extern "C" void app_main() {
         std::printf("],\"selected_transmitter\":");
         const auto* selected=peers.select(own,std::uint64_t(now));
         if(selected) print_mac(selected->announcement.source);else std::printf("null");
+#ifdef AIRBRIDGE_PRESENCE_TX
+        std::printf(",\"presence_tx_admitted\":%u,\"presence_tx_rejected\":%u",presence_ok,presence_failed);
+#endif
         std::printf("}\n");std::fflush(stdout);
     }
 }

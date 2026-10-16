@@ -1,5 +1,6 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 #include "awdl.hpp"
+#include "presence.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -46,6 +47,14 @@ static void parsing() {
         for(unsigned i=0;i<16;i++) {if(encoding==0) b[body+6+i]=6;else {b[body+6+2*i]=encoding==1 ? 0x51 : 6;b[body+7+2*i]=encoding==1 ? 6 : 0x51;}}
         require(parse_announcement({b.data(),b.size()},result)==Error::none && result.channels.mask(6)==65535,"all supported channel encodings");
     }
+    // Apple can publish legacy center-channel 151 alongside primary-channel 149.
+    std::vector<std::uint8_t> legacy(38);legacy[0]=15;legacy[1]=1;legacy[3]=3;legacy[4]=legacy[5]=255;
+    for(unsigned i=0;i<16;i++) {legacy[6+2*i]=0x1d;legacy[7+2*i]=i==8 ? 6 : 151;}
+    auto mixed=bytes;mixed.insert(mixed.begin()+76,legacy.begin(),legacy.end());put16(mixed,41,71);
+    require(parse_announcement({mixed.data(),mixed.size()},result)==Error::none && result.channels.channel[0]==149 && result.channels.mask(6)==256,"explicit primary-channel plan takes precedence over legacy center channels");
+    std::vector<std::uint8_t> other(38);other[0]=15;other[1]=3;other[3]=3;other[4]=other[5]=255;
+    append(mixed,18,other);
+    require(parse_announcement({mixed.data(),mixed.size()},result)==Error::malformed,"conflicting repeated explicit plans still rejected");
 }
 static void clocks() {
     Sync sync{root,20,44,16,4};Clock clock;
@@ -79,4 +88,43 @@ static void data() {
     b[24]=7;b[47]=1;require(parse_ipv6({b.data(),b.size()},decoded)==Error::malformed,"IPv6 declared size must match");
     auto ll=link_local(sender);require(ll[0]==0xfe && ll[1]==0x80 && ll[8]==0 && ll[11]==0xff && ll[12]==0xfe && ll[15]==5,"EUI-64 identity");
 }
-int main() {parsing();clocks();selection();data();std::cout<<checks<<" protocol checks passed\n";}
+static std::vector<std::uint8_t> record(const std::vector<std::uint8_t>& owner,unsigned type,const std::vector<std::uint8_t>& value) {
+    std::vector<std::uint8_t> output(2);put16(output,0,unsigned(owner.size()+1));output.insert(output.end(),owner.begin(),owner.end());
+    output.push_back(std::uint8_t(type));output.push_back(std::uint8_t(value.size()));output.push_back(std::uint8_t(value.size()>>8));
+    output.push_back(0);output.push_back(0);output.insert(output.end(),value.begin(),value.end());return output;
+}
+static void discovery() {
+    const std::vector<std::uint8_t> owner{4,'T','E','S','T',0xc0,7};
+    const auto srv=record(owner,33,{0,0,0,0,0x22,0x42,4,'h','o','s','t',0xc0,12}); // port 8770
+    ServiceOffer offer{};require(parse_service_record({srv.data(),srv.size()},offer)==Error::none && offer.airdrop && offer.port==8770 && std::strcmp(offer.instance.data(),"test")==0,"fixed dictionary SRV endpoint");
+    auto ptr=record({0xc0,7},12,owner);require(parse_service_record({ptr.data(),ptr.size()},offer)==Error::none && offer.airdrop && offer.port==0,"PTR advertises without inventing a port");
+    auto txt=record(owner,16,{9,'f','l','a','g','s','=','1','3','7'});require(parse_service_record({txt.data(),txt.size()},offer)==Error::none && offer.airdrop,"bounded TXT strings");
+    auto bad=txt;bad.back()=0;bad[14]=255;
+    require(parse_service_record({bad.data(),bad.size()},offer)!=Error::none,"TXT length cannot escape value");
+    for(std::size_t n=0;n<srv.size();n++) require(parse_service_record({srv.data(),n},offer)!=Error::none,"truncated service rejects");
+    auto unknown=record({0xc0,0xfe},33,{0,0,0,0,0x22,0x42,0});require(parse_service_record({unknown.data(),unknown.size()},offer)==Error::unsupported,"unknown dictionary is not a guessed name");
+    auto b=action();append(b,2,ptr);append(b,2,srv);append(b,2,txt);Announcement result{};
+    require(parse_announcement({b.data(),b.size()},result)==Error::none && result.service.airdrop && result.service.port==8770,"partial service records merge without losing SRV port");
+    PeerTable table;table.update(result,-60,1'000'000);result.service={};table.update(result,-60,2'000'000);
+    require(table.rows()[0].service_received_us==1'000'000 && table.rows()[0].announcement.service.port==8770,"ordinary announcements do not refresh service timestamp");
+}
+static void encoding() {
+    Presence state{};state.source=self;state.destination.fill(255);state.root=root;state.parent=sender;
+    std::copy_n("airbridge-test",14,state.host_label.begin());state.root_metric=530;state.self_metric=32;
+    state.root_counter=100;state.self_counter=1;state.depth=2;state.advertised.slot_aw_count=4;
+    state.advertised.channel.fill(6);state.clock.observe({root,20,44,16,4},1'000'000);
+    ManagementFrame frame{};
+    require(encode_presence(state,3,0x123,1'000'000,frame)==Error::none && frame.length<512,"bounded MIF encoding");
+    require(frame.bytes[0]==0xd0 && frame.bytes[22]==0x30 && frame.bytes[23]==0x12 && frame.bytes[40]==4 && frame.bytes[41]==73,"literal 802.11 sequence and sync TLV wire layout");
+    Announcement parsed{};require(parse_announcement({frame.bytes.data(),frame.length},parsed)==Error::none,"encoded presence parses");
+    require(parsed.source==self && parsed.election.parent==sender && parsed.election.root==root && parsed.sync.root==root,"root parent and actual transmitter stay distinct");
+    require(parsed.sync.aw_number==46 && parsed.sync.countdown_tu==20 && parsed.channels.mask(6)==65535,"current local-clock fields and pinned channel plan");
+    require(std::strcmp(parsed.hostname.data(),"airbridge-test")==0,"MIF owns real host label");
+    ManagementFrame psf{};require(encode_presence(state,0,0x124,1'000'000,psf)==Error::none && psf.length<frame.length,"PSF excludes MIF-only identity fields");
+    const auto old=frame.length;state.source.fill(0);require(encode_presence(state,3,0,1'000'000,frame)==Error::malformed && frame.length==old,"invalid source leaves output unchanged");
+    std::vector<std::uint8_t> packet(1280);packet[0]=0x60;packet[4]=4;packet[5]=216;
+    DataFrame encoded{};require(encode_ipv6(self,sender,65535,0x123,{packet.data(),packet.size()},encoded)==Error::none && encoded.length==1322,"maximum IPv6 MTU fits driver frame budget");
+    Ipv6Frame ip{};require(parse_ipv6({encoded.bytes.data(),encoded.length},ip)==Error::none && ip.sequence==65535 && ip.source==self && ip.destination==sender,"QoS data roundtrip preserves 16-bit sequence and endpoints");
+    packet[5]--;require(encode_ipv6(self,sender,0,0,{packet.data(),packet.size()},encoded)==Error::malformed,"encoder refuses inconsistent IPv6 lengths");
+}
+int main() {parsing();clocks();selection();data();discovery();encoding();std::cout<<checks<<" protocol checks passed\n";}

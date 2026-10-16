@@ -23,6 +23,12 @@ struct ChannelPlan {
     std::uint8_t encoding{}, slot_aw_count{};
     std::uint16_t mask(std::uint8_t wanted) const;
 };
+struct ServiceOffer {
+    bool airdrop{};
+    std::uint16_t port{};
+    std::array<char,64> instance{};
+};
+Error parse_service_record(Bytes value,ServiceOffer& output);
 struct Announcement {
     Mac source{}, destination{};
     std::uint32_t sender_timestamp{};
@@ -33,6 +39,7 @@ struct Announcement {
     ChannelPlan channels{};
     // AWDL host label, not the AirDrop /Discover display name.
     std::array<char,64> hostname{};
+    ServiceOffer service{};
 };
 Error parse_announcement(Bytes frame, Announcement& output);
 struct Ipv6Frame { Mac source{},destination{};std::uint16_t sequence{};Bytes packet{}; };
@@ -45,6 +52,7 @@ class Clock {
 public:
     bool observe(const Sync& sync, std::uint64_t received_us);
     bool valid() const { return valid_; }
+    std::uint16_t period_tu() const { return period_tu_; }
     std::uint16_t aw_number(std::uint64_t now_us) const;
     std::uint16_t countdown_tu(std::uint64_t now_us) const;
     std::uint8_t slot(std::uint64_t now_us) const;
@@ -55,7 +63,7 @@ private:
     std::uint8_t presence_{};
 };
 
-struct Peer { Announcement announcement{};std::uint64_t seen_us{},sync_received_us{};std::int8_t rssi{};bool used{}; };
+struct Peer { Announcement announcement{};std::uint64_t seen_us{},sync_received_us{},service_received_us{};std::int8_t rssi{};bool used{}; };
 class PeerTable {
 public:
     static constexpr std::size_t capacity=12;

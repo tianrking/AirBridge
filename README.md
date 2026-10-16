@@ -16,12 +16,12 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-The portable protocol core is implemented. Radio interoperability and native file transfer have not been qualified in this revision.
+The ESP32-S3 decoded real AWDL neighbors and AirDrop service advertisements. macOS accepted the bridge with `Posted Peer Presence`. Native files have not been transferred in this revision.
 
 | Capability | Status |
 | :--- | :--- |
 | AWDL parsing, clocks and topology | Implemented |
-| Apple peer admission | Planned |
+| Apple peer admission | Hardware verified |
 | IPv6 over AWDL | Planned |
 | Native device names | Planned |
 | Mac → Windows files | Planned |
@@ -68,7 +68,7 @@ At this revision, the scanner and protocol probes are development tools. They do
 
 ## Verification
 
-**Portable protocol assertions: 70.**
+**Portable protocol assertions: 117.**
 
 The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Hardware evidence is recorded separately as it becomes available.
 
@@ -102,6 +102,7 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 ## Documentation & evidence
 
 - [Protocol references](docs/protocol-references.md)
+- [AWDL neighbor admission](docs/awdl-qualification.md)
 
 ## Roadmap
 

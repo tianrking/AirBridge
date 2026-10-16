@@ -16,12 +16,12 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 ## 專案狀態
 
-可攜式協定核心已完成實作。此版本尚未驗證無線互通與原生檔案傳輸。
+ESP32-S3 已解析真實 AWDL 鄰居與 AirDrop 服務公告；macOS 以 `Posted Peer Presence` 接納橋接裝置。此版本尚未傳輸原生檔案。
 
 | 功能 | 狀態 |
 | :--- | :--- |
 | AWDL 解析、時鐘與拓樸 | 已實作 |
-| Apple 鄰居接納 | 規劃中 |
+| Apple 鄰居接納 | 已通過實機驗證 |
 | AWDL 上的 IPv6 | 規劃中 |
 | 原生裝置名稱 | 規劃中 |
 | Mac → Windows 檔案接收 | 規劃中 |
@@ -68,7 +68,7 @@ idf.py -C firmware -B work/scanner -p COM4 flash
 
 ## 驗證
 
-**可攜式協定檢查: 70.**
+**可攜式協定檢查: 117.**
 
 可攜式測試涵蓋畸形封包、邊界、同步與協定線格式；實機證據會於取得後另行記錄。
 
@@ -102,6 +102,7 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 ## 文件與實測證據
 
 - [協定參考](docs/protocol-references.md)
+- [AWDL 鄰居接納](docs/awdl-qualification.md)
 
 ## 後續規劃
 

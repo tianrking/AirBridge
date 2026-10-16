@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(airbridge_protocol LANGUAGES CXX)
-add_library(airbridge_protocol core/awdl.cpp)
+add_library(airbridge_protocol core/awdl.cpp core/discovery.cpp core/presence.cpp)
 target_include_directories(airbridge_protocol PUBLIC core)
 target_compile_features(airbridge_protocol PUBLIC cxx_std_17)
 if(MSVC)
