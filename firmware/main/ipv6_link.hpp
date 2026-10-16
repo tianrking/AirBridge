@@ -7,3 +7,4 @@ esp_err_t ipv6_link_begin(const airbridge::awdl::Mac& own);
 void ipv6_link_receive(const airbridge::awdl::Ipv6Frame& frame);
 void ipv6_link_poll(const airbridge::awdl::PeerTable& peers,std::uint64_t now);
 LinkCounters ipv6_link_counters();
+unsigned ipv6_link_index();

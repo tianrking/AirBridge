@@ -143,3 +143,4 @@ void ipv6_link_poll(const PeerTable& peers,std::uint64_t now) {
     }
 }
 LinkCounters ipv6_link_counters() {portENTER_CRITICAL(&lock);const auto value=counters;portEXIT_CRITICAL(&lock);return value;}
+unsigned ipv6_link_index() {return ready ? netif_get_index(&interface) : 0;}

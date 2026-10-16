@@ -16,14 +16,14 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-A real Mac `awdl0` interface completed a byte-checked IPv6 UDP roundtrip through the new wireless backend. Native file transfer remains unqualified.
+Native TLS 1.2 `/Discover` returned HTTP 200 and the real Apple device display name, including Unicode. File sending and receiving remain unqualified.
 
 | Capability | Status |
 | :--- | :--- |
 | AWDL parsing, clocks and topology | Implemented |
 | Apple peer admission | Hardware verified |
 | IPv6 over AWDL | Hardware verified |
-| Native device names | Planned |
+| Native device names | Verified through TLS `/Discover` |
 | Mac → Windows files | Planned |
 | Windows → Mac files | Not yet implemented |
 | Desktop application | Tauri 2 · React · TypeScript · Rust — planned |
@@ -68,7 +68,7 @@ At this revision, the scanner and protocol probes are development tools. They do
 
 ## Verification
 
-**Portable protocol assertions: 117.**
+**Portable protocol assertions: 166.**
 
 The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Hardware evidence is recorded separately as it becomes available.
 
@@ -104,6 +104,7 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 - [Protocol references](docs/protocol-references.md)
 - [AWDL neighbor admission](docs/awdl-qualification.md)
 - [IPv6 payload roundtrip](docs/ipv6-qualification.md)
+- [Native names through Discover](docs/discover-qualification.md)
 
 ## Roadmap
 

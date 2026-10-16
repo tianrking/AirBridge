@@ -5,6 +5,9 @@
 #ifdef AIRBRIDGE_IPV6_LINK
 #include "ipv6_link.hpp"
 #endif
+#ifdef AIRBRIDGE_DISCOVER_PROBE
+#include "discovery_probe.hpp"
+#endif
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -115,6 +118,11 @@ extern "C" void app_main() {
     static PeerTable peers;
     static Observation observation{};
     std::int64_t next=0;
+#ifdef AIRBRIDGE_DISCOVER_PROBE
+    const Mac probe_target{AIRBRIDGE_PROBE_PEER_BYTES};
+    unsigned probe_attempts=0;bool probe_complete=false;std::int64_t next_probe=0;
+    static DiscoveryResult probe_result{};
+#endif
 #ifdef AIRBRIDGE_PRESENCE_TX
     static Presence presence{};
     static ManagementFrame frame{};
@@ -131,6 +139,23 @@ extern "C" void app_main() {
         const auto now=esp_timer_get_time();
 #ifdef AIRBRIDGE_IPV6_LINK
         ipv6_link_poll(peers,std::uint64_t(now));
+#endif
+#ifdef AIRBRIDGE_DISCOVER_PROBE
+        if(discovery_probe_poll(probe_result)) {
+            std::printf("{\"event\":\"peer_identity\",\"mac\":");print_mac(probe_result.peer);
+            std::printf(",\"display_name\":");print_string(probe_result.identity.name.data());
+            std::printf(",\"model\":");print_string(probe_result.identity.model.data());
+            std::printf(",\"name_source\":\"airdrop_discover\",\"http_status\":%u,\"error\":%d,\"stage\":",probe_result.http_status,probe_result.error);print_string(probe_result.stage.data());
+            std::printf(",\"has_airdropable\":%s,\"airdropable\":%s}\n",probe_result.identity.has_airdropable?"true":"false",probe_result.identity.airdropable?"true":"false");
+            if(!probe_result.error) probe_complete=true;
+        }
+        if(!probe_complete && probe_attempts<3 && now>=next_probe) {
+            for(const auto& peer:peers.rows()) if(peer.used && peer.announcement.source==probe_target && peer.announcement.service.airdrop && peer.announcement.service.port &&
+               std::uint64_t(now)>=peer.service_received_us && std::uint64_t(now)-peer.service_received_us<10'000'000) {
+                if(discovery_probe_start(probe_target,peer.announcement.service.port)) {++probe_attempts;next_probe=now+15'000'000;}
+                break;
+            }
+        }
 #endif
 #ifdef AIRBRIDGE_PRESENCE_TX
         if(const auto* selected=peers.select(own,std::uint64_t(now))) {

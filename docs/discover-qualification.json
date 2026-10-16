@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "date": "2026-10-16",
+  "author": {
+    "name": "tianrking",
+    "email": "10758833+tianrking@users.noreply.github.com"
+  },
+  "scope": "New native AirDrop TLS client and real Discover friendly-name parsing",
+  "native_discover_verified": true,
+  "native_friendly_name_verified": true,
+  "native_file_transfer_verified": false,
+  "name_source": "airdrop_discover",
+  "friendly_name_redacted_in_public_receipt": true,
+  "utf8_name_contains_non_ascii": true,
+  "http_status": 200,
+  "is_airdropable": true,
+  "attempts": 3,
+  "earlier_attempts": [
+    {
+      "stage": "tcp_connect",
+      "error": -116
+    },
+    {
+      "stage": "tcp_connect",
+      "error": -116
+    }
+  ],
+  "tls_version": "TLSv1.2",
+  "idf": "6.1",
+  "chip": "ESP32-S3",
+  "application_sha256": "9582b9ed19d3862efbb0ef05f9285de44a7d1b8eb684d9699778c29299a7a55e",
+  "protocol_checks": 166,
+  "ipv6_rx": 29,
+  "ipv6_tx_completed": 35,
+  "ipv6_inflight_after": 0,
+  "known_working_firmware_restored": true,
+  "limitations": [
+    "No native file transfer qualification in this implementation",
+    "No desktop UI qualification",
+    "Everyone-mode observation; not contact-identity authentication",
+    "First two cold-start connects timed out; read-only Discover retried at bounded intervals",
+    "Private response bodies and credentials excluded"
+  ]
+}

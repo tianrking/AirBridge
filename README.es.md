@@ -16,14 +16,14 @@ AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows medi
 
 ## Estado del proyecto
 
-Una interfaz `awdl0` real de Mac completó un intercambio UDP sobre IPv6 con verificación byte a byte. La transferencia nativa de archivos sigue sin validarse.
+La solicitud nativa TLS 1.2 `/Discover` devolvió HTTP 200 y el nombre real del dispositivo Apple, incluidos caracteres Unicode. El envío y la recepción de archivos siguen sin validarse.
 
 | Función | Estado |
 | :--- | :--- |
 | Análisis AWDL, relojes y topología | Implementado |
 | Aceptación del vecino por Apple | Verificado en hardware |
 | IPv6 sobre AWDL | Verificado en hardware |
-| Nombres nativos de dispositivos | Previsto |
+| Nombres nativos de dispositivos | Verificados mediante TLS `/Discover` |
 | Archivos de Mac → Windows | Previsto |
 | Archivos de Windows → Mac | Aún no implementado |
 | Aplicación de escritorio | Tauri 2 · React · TypeScript · Rust — prevista |
@@ -68,7 +68,7 @@ En esta revisión, el escáner y las sondas del protocolo son herramientas de de
 
 ## Verificación
 
-**Comprobaciones del protocolo portátil: 117.**
+**Comprobaciones del protocolo portátil: 166.**
 
 Las pruebas portátiles cubren tramas malformadas, límites, sincronización y datos del protocolo. Las evidencias de hardware se registran por separado cuando están disponibles.
 
@@ -104,6 +104,7 @@ La MAC AWDL, la instancia DNS, la etiqueta del host y el nombre de AirDrop son i
 - [Referencias del protocolo](docs/protocol-references.md)
 - [Aceptación de vecinos AWDL](docs/awdl-qualification.md)
 - [Intercambio de datos IPv6](docs/ipv6-qualification.md)
+- [Nombres nativos mediante Discover](docs/discover-qualification.md)
 
 ## Próximos pasos
 

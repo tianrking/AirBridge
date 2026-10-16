@@ -1,11 +1,14 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 #include "awdl.hpp"
 #include "presence.hpp"
+#include "discover.hpp"
+#include "discover_fixture.hpp"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <vector>
+#include <string>
 using namespace airbridge::awdl;
 static unsigned checks;
 static void require(bool value,const char* message) {
@@ -127,4 +130,30 @@ static void encoding() {
     Ipv6Frame ip{};require(parse_ipv6({encoded.bytes.data(),encoded.length},ip)==Error::none && ip.sequence==65535 && ip.source==self && ip.destination==sender,"QoS data roundtrip preserves 16-bit sequence and endpoints");
     packet[5]--;require(encode_ipv6(self,sender,0,0,{packet.data(),packet.size()},encoded)==Error::malformed,"encoder refuses inconsistent IPv6 lengths");
 }
-int main() {parsing();clocks();selection();data();discovery();encoding();std::cout<<checks<<" protocol checks passed\n";}
+static void identities() {
+    airbridge::discovery::Identity identity{};
+    require(airbridge::discovery::parse_identity_plist({discover_fixture.data(),discover_fixture.size()},identity)==Error::none,"Python plistlib identity fixture");
+    require(std::strcmp(identity.name.data(),u8"测试 Mac 🔵")==0 && std::strcmp(identity.model.data(),"MacBookPro")==0,"UTF16 and surrogate pair decode into UTF8");
+    require(identity.has_airdropable && identity.airdropable,"actual IsAirDropable boolean");
+    for(std::size_t n=0;n<40;n++) require(airbridge::discovery::parse_identity_plist({discover_fixture.data(),n},identity)!=Error::none,"short plist rejects");
+    auto corrupt=discover_fixture;std::fill(corrupt.end()-24,corrupt.end()-16,std::uint8_t{255});
+    require(airbridge::discovery::parse_identity_plist({corrupt.data(),corrupt.size()},identity)==Error::malformed,"oversized plist object table rejects");
+    const auto request=airbridge::discovery::discover_request(111611);
+    require(request.size()==72 && request[32]==0x12 && request[33]==0 && request[34]==1 && request[35]==0xb3 && request[36]==0xfb,"independent support-flags request wire bytes");
+    std::string header="HTTP/1.1 200 OK\r\nContent-Length: "+std::to_string(discover_fixture.size())+"\r\n\r\n";
+    std::vector<std::uint8_t> wire(header.begin(),header.end());wire.insert(wire.end(),discover_fixture.begin(),discover_fixture.end());
+    airbridge::discovery::HttpResponse response{};
+    require(airbridge::discovery::parse_http_response(wire.data(),wire.size(),response)==Error::none && response.status==200 && response.body.size==discover_fixture.size(),"content-length response");
+    std::string chunked="HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n";
+    wire.assign(chunked.begin(),chunked.end());
+    const std::string prefix="5\r\n";wire.insert(wire.end(),prefix.begin(),prefix.end());
+    wire.insert(wire.end(),{'0','\r','\n','\r','\n','\r','\n'}); // payload looks like a terminal chunk
+    const auto old=wire;
+    require(airbridge::discovery::parse_http_response(wire.data(),wire.size(),response)==Error::truncated && wire==old,"binary terminal-marker lookalike is not completion; partial input unchanged");
+    wire.insert(wire.end(),{'0','\r','\n','\r','\n'});
+    require(airbridge::discovery::parse_http_response(wire.data(),wire.size(),response)==Error::none && response.body.size==5 && std::memcmp(response.body.data,"0\r\n\r\n",5)==0,"chunk parser consumes actual framed terminator");
+    const std::string ambiguous="HTTP/1.1 200 OK\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n";
+    wire.assign(ambiguous.begin(),ambiguous.end());
+    require(airbridge::discovery::parse_http_response(wire.data(),wire.size(),response)==Error::malformed,"conflicting HTTP framing rejects");
+}
+int main() {parsing();clocks();selection();data();discovery();encoding();identities();std::cout<<checks<<" protocol checks passed\n";}

@@ -1,4 +1,5 @@
-param([string]$BuildDirectory='work/s', [switch]$PresenceTx, [switch]$Ipv6Link)
+param([string]$BuildDirectory='work/s', [switch]$PresenceTx, [switch]$Ipv6Link,
+    [ValidatePattern('^(?:[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})?$')][string]$ProbePeer='')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path $PSScriptRoot -Parent
 if (-not $env:IDF_PATH) { $env:IDF_PATH='C:\esp\v6.1\esp-idf' }
@@ -12,5 +13,5 @@ $env:PATH='C:\Espressif\tools\cmake\4.0.3\bin;C:\Espressif\tools\ninja\1.12.1;C:
 $env:PYTHONUTF8='1'
 $env:ESP_IDF_VERSION='6.1'
 $buildPath=if ([IO.Path]::IsPathRooted($BuildDirectory)) {$BuildDirectory} else {Join-Path $projectRoot $BuildDirectory}
-& $idfPython (Join-Path $env:IDF_PATH 'tools\idf.py') -C (Join-Path $projectRoot 'firmware') -B $buildPath -D "AIRBRIDGE_PRESENCE_TX=$($PresenceTx.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_IPV6_LINK=$($Ipv6Link.IsPresent.ToString().ToUpperInvariant())" build
+& $idfPython (Join-Path $env:IDF_PATH 'tools\idf.py') -C (Join-Path $projectRoot 'firmware') -B $buildPath -D "AIRBRIDGE_PRESENCE_TX=$($PresenceTx.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_IPV6_LINK=$($Ipv6Link.IsPresent.ToString().ToUpperInvariant())" -D "AIRBRIDGE_PROBE_PEER=$ProbePeer" build
 if ($LASTEXITCODE -ne 0) { throw 'ESP-IDF build failed.' }
