@@ -12,8 +12,6 @@
 
 AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。可攜式 C++17 核心實作 AWDL 封包、同步與協定解析，ESP-IDF 6.1 提供無線後端；Tauri 2 桌面應用程式仍在規劃中。
 
-> 本 README 描述此歷史版本當時具備的能力；後續版本的檔案傳輸成果不代表此版本已通過驗收。
-
 ## 專案狀態
 
 macOS Finder 已找到 **AirBridge PC**，並成功傳送 262,145 位元組二進位檔，來源與接收端 SHA256 一致。6 Mbps 與定向公告／1 Mbps 對照設定均通過限定範圍的原生接收驗證。
@@ -108,6 +106,12 @@ python scripts/receive-native.py --directory received/inbox --log work/receive.j
 
 ```powershell
 cmd /c scripts\test-native.cmd
+```
+
+```powershell
+cmake -S . -B build
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
 ```
 
 ```powershell

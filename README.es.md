@@ -12,8 +12,6 @@
 
 AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows mediante un puerto serie. Su núcleo portátil en C++17 implementa las tramas AWDL, la sincronización y el análisis del protocolo; ESP-IDF 6.1 proporciona el backend de radio. La aplicación de escritorio con Tauri 2 está prevista.
 
-> Este README describe las funciones disponibles en este punto del historial. Los resultados de transferencia posteriores no validan esta revisión.
-
 ## Estado del proyecto
 
 Finder de macOS encontró **AirBridge PC** y entregó un binario de 262.145 bytes con SHA256 coincidente en origen y destino. Tanto el perfil de 6 Mbps como la comparación de anuncios dirigidos a 1 Mbps superaron pruebas acotadas de recepción nativa.
@@ -108,6 +106,12 @@ Las pruebas portátiles cubren tramas malformadas, límites, sincronización y d
 
 ```powershell
 cmd /c scripts\test-native.cmd
+```
+
+```powershell
+cmake -S . -B build
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
 ```
 
 ```powershell

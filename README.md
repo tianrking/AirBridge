@@ -12,8 +12,6 @@
 
 AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows over serial. A portable C++17 core implements AWDL framing, synchronization and protocol parsing; ESP-IDF 6.1 provides the radio backend. A Tauri 2 desktop application is planned.
 
-> This README describes the capabilities available at this point in the repository history. Later transfer results do not qualify this revision.
-
 ## Project status
 
 macOS Finder discovered **AirBridge PC** and delivered a 262,145-byte binary with matching source and destination SHA256. Both 6 Mbps and the directed-presence/1 Mbps comparison passed scoped native receive tests.
@@ -108,6 +106,12 @@ The portable suite covers malformed frames, bounds, synchronization and protocol
 
 ```powershell
 cmd /c scripts\test-native.cmd
+```
+
+```powershell
+cmake -S . -B build
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
 ```
 
 ```powershell
