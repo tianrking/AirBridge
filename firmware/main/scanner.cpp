@@ -2,6 +2,9 @@
 // Receive-only protocol qualification image. No AWDL presence or file service.
 #include "awdl.hpp"
 #include "presence.hpp"
+#ifdef AIRBRIDGE_IPV6_LINK
+#include "ipv6_link.hpp"
+#endif
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
@@ -29,9 +32,17 @@ std::array<std::uint8_t,512> sample{};
 std::size_t sample_length{};
 #endif
 void on_frame(void* buffer,wifi_promiscuous_pkt_type_t type) {
-    if(type!=WIFI_PKT_MGMT || !buffer) return;
+    if(!buffer) return;
     const auto* packet=static_cast<const wifi_promiscuous_pkt_t*>(buffer);
     if(packet->rx_ctrl.rx_state || packet->rx_ctrl.sig_len<44) return;
+#ifdef AIRBRIDGE_IPV6_LINK
+    if(type==WIFI_PKT_DATA) {
+        Ipv6Frame parsed{};
+        if(parse_ipv6({packet->payload,std::size_t(packet->rx_ctrl.sig_len)-4},parsed)==Error::none) ipv6_link_receive(parsed);
+        return;
+    }
+#endif
+    if(type!=WIFI_PKT_MGMT) return;
     Observation observation{};
     const auto result=parse_announcement({packet->payload,std::size_t(packet->rx_ctrl.sig_len)-4},observation.announcement);
     if(result==Error::not_awdl) return;
@@ -90,9 +101,15 @@ extern "C" void app_main() {
     if(!check(esp_wifi_start(),"wifi_start") ||
        !check(esp_wifi_set_ps(WIFI_PS_NONE),"wifi_power_save") || !check(esp_wifi_set_channel(6,WIFI_SECOND_CHAN_NONE),"channel")) return;
     wifi_promiscuous_filter_t filter{};filter.filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT;
+#ifdef AIRBRIDGE_IPV6_LINK
+    filter.filter_mask|=WIFI_PROMIS_FILTER_MASK_DATA;
+#endif
     if(!check(esp_wifi_set_promiscuous_filter(&filter),"filter") || !check(esp_wifi_set_promiscuous_rx_cb(on_frame),"callback") ||
        !check(esp_wifi_set_promiscuous(true),"monitor")) return;
     Mac own{};esp_wifi_get_mac(WIFI_IF_STA,own.data());
+#ifdef AIRBRIDGE_IPV6_LINK
+    if(!check(ipv6_link_begin(own),"awdl_netif")) return;
+#endif
     std::printf("{\"event\":\"scanner_ready\",\"channel\":6,\"native_transfer_verified\":false}\n");
     // The 12-row table must not consume the default 3584-byte app_main stack.
     static PeerTable peers;
@@ -112,6 +129,9 @@ extern "C" void app_main() {
         if(xQueueReceive(observations,&observation,pdMS_TO_TICKS(5))==pdTRUE && observation.announcement.source!=own)
             peers.update(observation.announcement,observation.rssi,observation.received);
         const auto now=esp_timer_get_time();
+#ifdef AIRBRIDGE_IPV6_LINK
+        ipv6_link_poll(peers,std::uint64_t(now));
+#endif
 #ifdef AIRBRIDGE_PRESENCE_TX
         if(const auto* selected=peers.select(own,std::uint64_t(now))) {
             const auto& info=selected->announcement;
@@ -157,6 +177,10 @@ extern "C" void app_main() {
         if(selected) print_mac(selected->announcement.source);else std::printf("null");
 #ifdef AIRBRIDGE_PRESENCE_TX
         std::printf(",\"presence_tx_admitted\":%u,\"presence_tx_rejected\":%u",presence_ok,presence_failed);
+#endif
+#ifdef AIRBRIDGE_IPV6_LINK
+        const auto link=ipv6_link_counters();
+        std::printf(",\"ipv6_rx\":%u,\"ipv6_rx_dropped\":%u,\"ipv6_tx_queued\":%u,\"ipv6_tx_admitted\":%u,\"ipv6_tx_completed\":%u,\"ipv6_tx_failed\":%u,\"ipv6_inflight\":%u",link.rx,link.rx_dropped,link.tx_queued,link.tx_admitted,link.tx_completed,link.tx_failed,link.tx_inflight);
 #endif
         std::printf("}\n");std::fflush(stdout);
     }

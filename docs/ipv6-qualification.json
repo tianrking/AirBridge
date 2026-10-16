@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "date": "2026-10-16",
+  "author": {
+    "name": "tianrking",
+    "email": "10758833+tianrking@users.noreply.github.com"
+  },
+  "scope": "New AWDL/lwIP IPv6 data-plane diagnostic; not native AirDrop files",
+  "native_ipv6_roundtrip_verified": true,
+  "native_airdrop_transfer_verified": false,
+  "idf": "6.1",
+  "chip": "ESP32-S3",
+  "application_sha256": "72357b33a94fe7bed0a1c3238c180047428b8a30725ec50b8d355c1b37477b98",
+  "mac_interface": "awdl0",
+  "diagnostic_udp_port": 8779,
+  "payload_bytes": 70,
+  "source_and_return_sha256": "1a67c4b6dc477424eb3632703d18592d4716fc733c4b70ce586330594ee1667a0",
+  "source_bound_to_awdl": true,
+  "destination_scope_checked": true,
+  "payload_byte_comparison": true,
+  "board_counters": {
+    "ipv6_rx": 1,
+    "ipv6_rx_dropped": 0,
+    "ipv6_tx_queued": 6,
+    "ipv6_tx_admitted": 5,
+    "ipv6_tx_completed": 5,
+    "ipv6_tx_failed": 1,
+    "ipv6_inflight": 0
+  },
+  "failed_startup_control_packet_explanation": "One unspecified-source startup control packet was refused by the own-source transmit guard; it is not counted as a successful delivery",
+  "tx_callback": "public esp_wifi_register_80211_tx_cb",
+  "known_working_firmware_restored": true,
+  "limitations": [
+    "UDP echo is a diagnostic endpoint, not AirDrop",
+    "No TLS, Discover, friendly name or file qualification yet in this implementation",
+    "No loopback or LAN fallback used",
+    "Private traffic and credentials excluded"
+  ]
+}

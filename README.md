@@ -16,13 +16,13 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-The ESP32-S3 decoded real AWDL neighbors and AirDrop service advertisements. macOS accepted the bridge with `Posted Peer Presence`. Native files have not been transferred in this revision.
+A real Mac `awdl0` interface completed a byte-checked IPv6 UDP roundtrip through the new wireless backend. Native file transfer remains unqualified.
 
 | Capability | Status |
 | :--- | :--- |
 | AWDL parsing, clocks and topology | Implemented |
 | Apple peer admission | Hardware verified |
-| IPv6 over AWDL | Planned |
+| IPv6 over AWDL | Hardware verified |
 | Native device names | Planned |
 | Mac → Windows files | Planned |
 | Windows → Mac files | Not yet implemented |
@@ -103,6 +103,7 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 
 - [Protocol references](docs/protocol-references.md)
 - [AWDL neighbor admission](docs/awdl-qualification.md)
+- [IPv6 payload roundtrip](docs/ipv6-qualification.md)
 
 ## Roadmap
 

@@ -16,13 +16,13 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 ## 專案狀態
 
-ESP32-S3 已解析真實 AWDL 鄰居與 AirDrop 服務公告；macOS 以 `Posted Peer Presence` 接納橋接裝置。此版本尚未傳輸原生檔案。
+已透過真實 Mac `awdl0` 介面完成 IPv6 UDP 資料往返，並逐位元組比對內容。原生檔案傳輸尚未通過驗收。
 
 | 功能 | 狀態 |
 | :--- | :--- |
 | AWDL 解析、時鐘與拓樸 | 已實作 |
 | Apple 鄰居接納 | 已通過實機驗證 |
-| AWDL 上的 IPv6 | 規劃中 |
+| AWDL 上的 IPv6 | 已通過實機驗證 |
 | 原生裝置名稱 | 規劃中 |
 | Mac → Windows 檔案接收 | 規劃中 |
 | Windows → Mac 檔案傳送 | 尚未實作 |
@@ -103,6 +103,7 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 
 - [協定參考](docs/protocol-references.md)
 - [AWDL 鄰居接納](docs/awdl-qualification.md)
+- [IPv6 資料往返](docs/ipv6-qualification.md)
 
 ## 後續規劃
 
