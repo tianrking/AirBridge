@@ -40,9 +40,34 @@ archive validation, Windows flushes each file, publishes the temporary directory
 and acknowledges a fresh commit nonce; only then does the device send HTTP 200.
 An HTTP write result alone does not prove the Apple UI completed delivery.
 
-The retry has also encountered native discovery/connectivity stalling before
-`/Ask`. Large-file receiving and reconnect stability remain under hardware test.
-The current independent implementation does not yet provide file sending.
+The retry initially stalled before `/Ask`. Complete SDK RF calibration alone
+did not restore the fixed identity's route. Correcting the single-band datapath
+profile also did not restore that identity's route. A subsequent boot with a
+fresh locally administered AWDL identity was accepted by macOS with
+`Posted Peer Presence`; native TLS and `/Discover` resumed. This supports testing
+stale identity state, but does not prove Apple's cache was the sole cause.
+
+## Binary receiving after backpressure repair
+
+The subsequent native Finder retry received `AirBridge-native-receive-262145.bin`,
+**262,145 bytes**, plus its 220-byte AppleDouble sidecar. Both the Mac source and
+actual Windows file were rehashed after delivery and matched:
+
+`eb3ddcc7caeb6bef3d10eacdfc07ce0a89997ae4741711c528cce1402d65596c`
+
+Windows published the directory and acknowledged the commit nonce. The device
+recorded `host_committed: true` and `response_written: true`. Exact image SHA256:
+
+`ac3db69e668ca0e363c705f2b7826cf7eac55732f76509f88d28f1d96e3f6b41`
+
+Its configuration used BLE, channel 6, 6 Mbps raw TX, 20 dBm configured ceiling,
+full calibration and the single-band datapath profile. The image is retained
+locally; private captures and TLS keys are not published.
+
+This qualifies that native binary receive, not general reconnect reliability,
+maximum-size transfer or sending. Each boot now generates a unicast AWDL
+identity: read `radio_identity` and derive the current IPv6 address rather than
+using an old MAC. The independent implementation does not yet send files.
 
 ## Reproduce on the authorized development board
 

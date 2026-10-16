@@ -18,6 +18,7 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "esp_system.h"
+#include "esp_random.h"
 #include "nvs_flash.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -107,8 +108,9 @@ extern "C" void app_main() {
     if(!check(esp_wifi_init(&config),"wifi_init") || !check(esp_wifi_set_storage(WIFI_STORAGE_RAM),"wifi_storage") ||
        !check(esp_wifi_set_mode(WIFI_MODE_STA),"wifi_mode")) return;
 #ifdef AIRBRIDGE_PRESENCE_TX
-    // Retain this board's already assigned experimental identity for comparison.
-    const Mac identity{0xba,0x1a,0xdd,0x47,0x3b,0x3e};
+    // A boot-local unicast identity avoids stale Apple neighbor/service entries
+    // surviving a replaced development image. USB hardware identity is separate.
+    Mac identity{};esp_fill_random(identity.data(),identity.size());identity[0]=(identity[0]&0xfc)|2;
     if(!check(esp_wifi_set_mac(WIFI_IF_STA,identity.data()),"radio_identity") ||
        !check(esp_wifi_config_80211_tx_rate(WIFI_IF_STA,WIFI_PHY_RATE_6M),"raw_rate")) return;
     airbridge_set_tx_identity(identity.data());
@@ -124,6 +126,7 @@ extern "C" void app_main() {
     if(!check(esp_wifi_set_promiscuous_filter(&filter),"filter") || !check(esp_wifi_set_promiscuous_rx_cb(on_frame),"callback") ||
        !check(esp_wifi_set_promiscuous(true),"monitor")) return;
     Mac own{};esp_wifi_get_mac(WIFI_IF_STA,own.data());
+    std::printf("{\"event\":\"radio_identity\",\"mac\":");print_mac(own);std::printf("}\n");
 #ifdef AIRBRIDGE_IPV6_LINK
     if(!check(ipv6_link_begin(own),"awdl_netif")) return;
 #endif

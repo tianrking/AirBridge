@@ -123,6 +123,13 @@ static void encoding() {
     require(parsed.source==self && parsed.election.parent==sender && parsed.election.root==root && parsed.sync.root==root,"root parent and actual transmitter stay distinct");
     require(parsed.sync.aw_number==46 && parsed.sync.countdown_tu==20 && parsed.channels.mask(6)==65535,"current local-clock fields and pinned channel plan");
     require(std::strcmp(parsed.hostname.data(),"airbridge-test")==0,"MIF owns real host label");
+    bool single_band=false;
+    for(std::size_t at=40;at+3<=frame.length;) {
+        const auto tag=frame.bytes[at];const auto size=unsigned(frame.bytes[at+1])|unsigned(frame.bytes[at+2])<<8;
+        if(tag==12 && size==15) single_band=frame.bytes[at+3]==0x84 && frame.bytes[at+4]==0x83 && frame.bytes[at+16]==8 && frame.bytes[at+17]==0;
+        at+=3+size;
+    }
+    require(single_band,"S3 literal datapath profile advertises channel following and social channel 6");
     ManagementFrame psf{};require(encode_presence(state,0,0x124,1'000'000,psf)==Error::none && psf.length<frame.length,"PSF excludes MIF-only identity fields");
     const auto old=frame.length;state.source.fill(0);require(encode_presence(state,3,0,1'000'000,frame)==Error::malformed && frame.length==old,"invalid source leaves output unchanged");
     std::vector<std::uint8_t> packet(1280);packet[0]=0x60;packet[4]=4;packet[5]=216;

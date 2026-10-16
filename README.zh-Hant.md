@@ -16,7 +16,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 
 ## 專案狀態
 
-macOS Finder 已找到 **AirBridge PC**，並將 22,656 位元組文字檔傳至 Windows，雙方 SHA256 一致。較大的二進位檔曾因序列埠偏移檢查失敗而被拒絕；逐區塊確認修正仍待實機驗收。
+macOS Finder 已找到 **AirBridge PC**，並將文字檔與 262,145 位元組二進位檔傳至 Windows，來源與接收檔案的 SHA256 一致。長時間可發現性與獨立傳送功能仍待完成。
 
 | 功能 | 狀態 |
 | :--- | :--- |
@@ -24,9 +24,20 @@ macOS Finder 已找到 **AirBridge PC**，並將 22,656 位元組文字檔傳至
 | Apple 鄰居接納 | 已通過實機驗證 |
 | AWDL 上的 IPv6 | 已通過實機驗證 |
 | 原生裝置名稱 | 已透過 TLS `/Discover` 驗證 |
-| Mac → Windows 檔案接收 | 已驗證 22,656 位元組文字檔 |
+| Mac → Windows 檔案接收 | 已驗證文字檔與 262,145 位元組二進位檔 |
 | Windows → Mac 檔案傳送 | 尚未實作 |
 | 桌面應用程式 | Tauri 2 · React · TypeScript · Rust — 規劃中 |
+
+<details>
+<summary>已驗證的二進位檔指紋</summary>
+
+`AirBridge-native-receive-262145.bin` · 262,145 位元組
+
+```text
+eb3ddcc7caeb6bef3d10eacdfc07ce0a89997ae4741711c528cce1402d65596c
+```
+
+</details>
 
 > 目前仍屬開發階段：長時間可發現性、反覆重新連線、更大檔案、iPhone 互通、僅限聯絡人身分驗證與資料夾傳輸尚未通過驗收。掃描到 MAC 或收到發送完成回呼，都不足以證明檔案已送達。
 
@@ -88,7 +99,7 @@ python scripts/receive-native.py --directory received/inbox --log work/receive.j
 
 ## 驗證
 
-**可攜式協定檢查: 276.** **Windows 接收端測試: 11.**
+**可攜式協定檢查: 277.** **Windows 接收端測試: 11.**
 
 可攜式測試涵蓋畸形封包、邊界、同步與協定線格式；主機測試檢查偏移、雜湊與可靠落盤的失敗情況。實機證據另行記錄。
 

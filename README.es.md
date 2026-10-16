@@ -16,7 +16,7 @@ AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows medi
 
 ## Estado del proyecto
 
-Finder de macOS encontró **AirBridge PC** y envió a Windows un texto de 22.656 bytes con SHA256 coincidente. Un binario mayor fue rechazado por un salto de desplazamiento serie; la corrección del control de flujo aún necesita validación en hardware.
+Finder de macOS encontró **AirBridge PC** y envió texto y un binario de 262.145 bytes a Windows. Los SHA256 de origen y destino coincidieron. La detección prolongada y el envío independiente siguen pendientes.
 
 | Función | Estado |
 | :--- | :--- |
@@ -24,9 +24,20 @@ Finder de macOS encontró **AirBridge PC** y envió a Windows un texto de 22.656
 | Aceptación del vecino por Apple | Verificado en hardware |
 | IPv6 sobre AWDL | Verificado en hardware |
 | Nombres nativos de dispositivos | Verificados mediante TLS `/Discover` |
-| Archivos de Mac → Windows | Texto de 22.656 bytes verificado |
+| Archivos de Mac → Windows | Texto y binario de 262.145 bytes verificados |
 | Archivos de Windows → Mac | Aún no implementado |
 | Aplicación de escritorio | Tauri 2 · React · TypeScript · Rust — prevista |
+
+<details>
+<summary>Huella del binario verificado</summary>
+
+`AirBridge-native-receive-262145.bin` · 262.145 bytes
+
+```text
+eb3ddcc7caeb6bef3d10eacdfc07ce0a89997ae4741711c528cce1402d65596c
+```
+
+</details>
 
 > Proyecto en desarrollo: siguen sin validarse la visibilidad prolongada, las reconexiones repetidas, los archivos mayores, la interoperabilidad con iPhone, la autenticación de Solo contactos y las carpetas. Detectar una MAC o recibir una confirmación de transmisión no demuestra la entrega de un archivo.
 
@@ -88,7 +99,7 @@ Cada bloque serie requiere confirmación. Windows verifica tamaños y SHA256, si
 
 ## Verificación
 
-**Comprobaciones del protocolo portátil: 276.** **Pruebas del receptor de Windows: 11.**
+**Comprobaciones del protocolo portátil: 277.** **Pruebas del receptor de Windows: 11.**
 
 Las pruebas portátiles cubren tramas malformadas, límites, sincronización y datos del protocolo. Las pruebas del equipo comprueban fallos de desplazamiento, hash y publicación duradera. Las evidencias de hardware se registran por separado.
 

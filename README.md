@@ -16,7 +16,7 @@ AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows ove
 
 ## Project status
 
-macOS Finder discovered **AirBridge PC** and sent a 22,656-byte text file to Windows with matching SHA256. A larger binary attempt failed serial offset validation; the backpressure repair still needs hardware acceptance.
+macOS Finder discovered **AirBridge PC** and sent text and a 262,145-byte binary to Windows. Source and received-file SHA256 matched. Long-term discoverability and independent file sending remain open.
 
 | Capability | Status |
 | :--- | :--- |
@@ -24,9 +24,20 @@ macOS Finder discovered **AirBridge PC** and sent a 22,656-byte text file to Win
 | Apple peer admission | Hardware verified |
 | IPv6 over AWDL | Hardware verified |
 | Native device names | Verified through TLS `/Discover` |
-| Mac → Windows files | 22,656-byte text verified |
+| Mac → Windows files | Text and 262,145-byte binary verified |
 | Windows → Mac files | Not yet implemented |
 | Desktop application | Tauri 2 · React · TypeScript · Rust — planned |
+
+<details>
+<summary>Verified binary fingerprint</summary>
+
+`AirBridge-native-receive-262145.bin` · 262,145 bytes
+
+```text
+eb3ddcc7caeb6bef3d10eacdfc07ce0a89997ae4741711c528cce1402d65596c
+```
+
+</details>
 
 > Development status: long-term visibility, repeated reconnects, larger transfers, iPhone interoperability, contact-only authentication and folder transfer remain unqualified. A discovered MAC or a successful TX callback does not prove file delivery.
 
@@ -88,7 +99,7 @@ Each serial chunk must be acknowledged. Windows checks sizes and SHA256, flushes
 
 ## Verification
 
-**Portable protocol assertions: 276.** **Windows receiver tests: 11.**
+**Portable protocol assertions: 277.** **Windows receiver tests: 11.**
 
 The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Host tests exercise offset, digest and durable-publication failures. Hardware evidence is recorded separately.
 

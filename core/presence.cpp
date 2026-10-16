@@ -60,7 +60,9 @@ Error encode_presence(const Presence& state,std::uint8_t kind,std::uint16_t sequ
         tag=out.tlv(7);out.u16(0);out.u16(0x11ce);out.u8(0x1b);out.u8(0xff);out.u16(0);out.u8(0);out.end(tag);
         tag=out.tlv(16);out.u8(3);out.u8(unsigned(name_size));out.block(reinterpret_cast<const std::uint8_t*>(state.host_label.data()),name_size);out.u8(0xc0);out.u8(12);out.end(tag);
     }
-    tag=out.tlv(12);out.u16(0x8f24);out.u8('X');out.u8('0');out.u8(0);out.u16(1);out.block(state.source.data(),6);out.u16(0);out.end(tag);
+    // Single-band channel-following profile. Do not advertise Linux adapter
+    // capabilities that this 2.4 GHz ESP32-S3 backend cannot provide.
+    tag=out.tlv(12);out.u16(0x8384);out.u8('X');out.u8('0');out.u8(0);out.u16(1);out.block(state.source.data(),6);out.u16(8);out.end(tag);
     tag=out.tlv(21);out.u8(0x93);out.u8(1);out.end(tag);
     tag=out.tlv(20);out.block(state.root.data(),6);out.end(tag);
     if(!out.valid) return Error::truncated;
