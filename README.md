@@ -59,7 +59,7 @@ COM4 in the browser chooser. Browser-capable firmware with `hardware_id` support
 is required. This is a development build; earlier CLI native transfer evidence
 does not qualify the new browser path.
 
-[Web setup and checked-storage design](desktop/README.web.md) · [Measured web status](docs/web-qualification.md) · [Interface details and information sources](docs/product-details.md)
+[Web setup and checked-storage design](desktop/README.web.md) · [Measured web status](docs/web-qualification.md) · [Interface details and information sources](docs/product-details.md) · [Failure recovery and automated checks](docs/failure-recovery.md)
 
 ## Desktop application
 

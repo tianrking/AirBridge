@@ -1,0 +1,368 @@
+{
+  "status": "passed",
+  "total": 83,
+  "passed": 83,
+  "failed": 0,
+  "serial": "virtual streams only",
+  "storage": "real temporary host files",
+  "hardware": false,
+  "suites": [
+    {
+      "file": "src/contracts.test.ts",
+      "checks": [
+        {
+          "name": "desktop event ordering does not roll a completed transfer back when initial IPC arrives late",
+          "status": "passed"
+        },
+        {
+          "name": "desktop event ordering treats uncertain results as terminal and finishing as incomplete",
+          "status": "passed"
+        },
+        {
+          "name": "language preference uses English when storage is unavailable or contains an unknown locale",
+          "status": "passed"
+        },
+        {
+          "name": "language preference restores supported languages and includes every visible string",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "file": "src/presence.test.ts",
+      "checks": [
+        {
+          "name": "discovery presentation eligibility retains stable ordering when scanner order changes and updates native names",
+          "status": "passed"
+        },
+        {
+          "name": "discovery presentation eligibility disables a lost device immediately and removes it after the bounded exit",
+          "status": "passed"
+        },
+        {
+          "name": "discovery presentation eligibility cancels departure if the same identity reappears without adding a duplicate",
+          "status": "passed"
+        },
+        {
+          "name": "discovery presentation eligibility removes lost entries immediately for reduced motion and ignores unadvertised peers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "file": "src/presentation.test.ts",
+      "checks": [
+        {
+          "name": "honest presentation keeps unconfirmed ownership blocked while exposing a cleanup retry",
+          "status": "passed"
+        },
+        {
+          "name": "honest presentation does not turn complete preparation or archive bytes into delivery",
+          "status": "passed"
+        },
+        {
+          "name": "honest presentation searches retained names and all received files without mutating history",
+          "status": "passed"
+        },
+        {
+          "name": "honest presentation renders unavailable dates explicitly instead of a fabricated timestamp",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "file": "src/web/failures.test.ts",
+      "checks": [
+        {
+          "name": "session fault boundaries never opens an unapproved USB transport",
+          "status": "passed"
+        },
+        {
+          "name": "session fault boundaries fails once on qualification_boot and rejects pending work",
+          "status": "passed"
+        },
+        {
+          "name": "session fault boundaries fails once on command_invalid and rejects pending work",
+          "status": "passed"
+        },
+        {
+          "name": "session fault boundaries rejects queued requests on the first deadline and never writes the next command",
+          "status": "passed"
+        },
+        {
+          "name": "repeated ownership and duplex history completes 30 reconnect cycles with fresh handshakes and no orphan reader",
+          "status": "passed"
+        },
+        {
+          "name": "repeated ownership and duplex history does not accept wire records posing as host-verified results",
+          "status": "passed"
+        },
+        {
+          "name": "repeated ownership and duplex history keeps repeated native receive IDs separate and preserves a completed receive across send loss",
+          "status": "passed"
+        },
+        {
+          "name": "repeated ownership and duplex history rejects malformed byte progress -1/5",
+          "status": "passed"
+        },
+        {
+          "name": "repeated ownership and duplex history rejects malformed byte progress 2/1",
+          "status": "passed"
+        },
+        {
+          "name": "repeated ownership and duplex history rejects malformed byte progress 0.5/1",
+          "status": "passed"
+        },
+        {
+          "name": "repeated ownership and duplex history rejects malformed byte progress 1/1.5",
+          "status": "passed"
+        },
+        {
+          "name": "repeated ownership and duplex history rejects malformed byte progress 1/9007199254740992",
+          "status": "passed"
+        },
+        {
+          "name": "disconnect and reconnect ownership retires peers after end and revalidates the next port",
+          "status": "passed"
+        },
+        {
+          "name": "disconnect and reconnect ownership retires peers after breakRead and revalidates the next port",
+          "status": "passed"
+        },
+        {
+          "name": "disconnect and reconnect ownership keeps interrupted history terminal across a fresh connection",
+          "status": "passed"
+        },
+        {
+          "name": "disconnect and reconnect ownership suppresses concurrent opens and cancels an unresolved chooser without opening its result",
+          "status": "passed"
+        },
+        {
+          "name": "disconnect and reconnect ownership closes an actual in-flight open before releasing its owner",
+          "status": "passed"
+        },
+        {
+          "name": "disconnect and reconnect ownership blocks reuse after close failure and permits an explicit cleanup retry",
+          "status": "passed"
+        },
+        {
+          "name": "disconnect and reconnect ownership times out stuck cleanup without claiming port release",
+          "status": "passed"
+        },
+        {
+          "name": "cancellation races and missing progress keeps cancellation pending until the authoritative result (success=true)",
+          "status": "passed"
+        },
+        {
+          "name": "cancellation races and missing progress keeps cancellation pending until the authoritative result (success=false)",
+          "status": "passed"
+        },
+        {
+          "name": "cancellation races and missing progress does not turn a cancel ACK followed by link loss into a confirmed cancellation",
+          "status": "passed"
+        },
+        {
+          "name": "cancellation races and missing progress settles a name lookup on disconnect without issuing a later resolver command",
+          "status": "passed"
+        },
+        {
+          "name": "cancellation races and missing progress cancels a blocked source read and prevents its late result from staging",
+          "status": "passed"
+        },
+        {
+          "name": "cancellation races and missing progress cleans rejected staging once without retrying the source",
+          "status": "passed"
+        },
+        {
+          "name": "cancellation races and missing progress fails closed on write errors and does not replay the source",
+          "status": "passed"
+        },
+        {
+          "name": "cancellation races and missing progress expires a stalled receive even while scanner reports continue",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification withholds completion and rejects later records after file create failure",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification withholds completion and rejects later records after file write failure",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification withholds completion and rejects later records after file close failure",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification withholds completion and rejects later records after file read failure",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification withholds receipt receiving success when receipt close fails",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification withholds receipt files_verified success when receipt close fails",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification withholds receipt completed success when receipt close fails",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt create failure during receiving",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt create failure during files_verified",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt create failure during completed",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt write failure during receiving",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt write failure during files_verified",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt write failure during completed",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt read failure during receiving",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt read failure during files_verified",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rejects receipt read failure during completed",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification detects persisted receipt corruption instead of trusting a resolved close",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rechecks actual files before false publication",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification rechecks actual files before true publication",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification keeps native response failure terminal and does not accept a later success for that job",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification does not ACK a write that resolves after receiver shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "fail-closed receive and saved-data verification propagates storage failure through the serial owner and keeps it failed after recovery",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "file": "src/web/web.test.ts",
+      "checks": [
+        {
+          "name": "browser wire protocol matches the independent literal CRC fixture and rejects framing injection",
+          "status": "passed"
+        },
+        {
+          "name": "browser wire protocol recovers JSON from fragmented diagnostics and fails closed on an oversized record",
+          "status": "passed"
+        },
+        {
+          "name": "browser wire protocol rejects unsafe names, noncanonical base64 and oversized sources",
+          "status": "passed"
+        },
+        {
+          "name": "browser wire protocol produces binary plists decoded independently by Python, including Unicode and empty files",
+          "status": "passed"
+        },
+        {
+          "name": "checked browser receive publication saves actual files, closes/reopens/hashes, commits, and waits for the native response",
+          "status": "passed"
+        },
+        {
+          "name": "checked browser receive publication withholds COMMIT when persisted content differs from the serial bytes",
+          "status": "passed"
+        },
+        {
+          "name": "checked browser receive publication withholds COMMIT on close failure and rejects chunk replays or early commit",
+          "status": "passed"
+        },
+        {
+          "name": "checked browser receive publication handles zero-byte files without inventing a chunk",
+          "status": "passed"
+        },
+        {
+          "name": "checked browser receive publication rejects traversal, oversized offers, inconsistent manifests and stale identities",
+          "status": "passed"
+        },
+        {
+          "name": "single-owner asynchronous serial session negotiates without resetting, binds the factory identity and releases both locks",
+          "status": "passed"
+        },
+        {
+          "name": "single-owner asynchronous serial session closes on a missing or unexpected hardware identity before accepting transfers",
+          "status": "passed"
+        },
+        {
+          "name": "single-owner asynchronous serial session services incoming chunk acknowledgements while an outgoing command waits",
+          "status": "passed"
+        },
+        {
+          "name": "single-owner asynchronous serial session does not automatically resend timed-out commands",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state exposes handshake provenance and missing RSSI without inventing a reading",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state retains native names in history and scanner reports do not rewrite transfer timestamps",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state retains every checked receipt file and waits for native confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state resolves real names without substituting DNS labels and expires stale advertisements",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state stages a selected file, keeps 100% upload incomplete, and checks native completion identity and hash",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state does not mark a mismatched native digest completed or retry the file",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state cancels staging without issuing native SEND or replaying commands",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state cancels a native deadline cooperatively while keeping its destination result uncertain",
+          "status": "passed"
+        },
+        {
+          "name": "browser workflow state keeps an explicit native refusal failed instead of completed or automatically retried",
+          "status": "passed"
+        }
+      ]
+    }
+  ]
+}

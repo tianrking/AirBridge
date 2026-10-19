@@ -127,6 +127,15 @@ This interface does not add contacts-only authentication or local incoming conse
 
 ## Verification
 
+Disconnect/reconnect, cancellation, receive failure and saved-file checks are
+covered by [failure recovery and automated acceptance](../docs/failure-recovery.md).
+With the development server running, `/tests/failures.html` runs six application
+flows automatically using the production React view/command dispatcher, virtual
+serial and real browser OPFS. It never opens hardware or a real USB chooser.
+The production bundle excludes the fixture. History entries remain separate even
+when firmware reuses a wire transfer ID after restart.
+
+
 ```powershell
 npm test
 npm run build

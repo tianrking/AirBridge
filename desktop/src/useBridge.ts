@@ -18,10 +18,9 @@ const initial: Snapshot = {
 };
 export function useBridge() {
   const [snapshot, setSnapshot] = useState(initial);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const inFlight = useRef(new Set<string>());
   const native = isTauri();
+  const commands = useBridgeCommands(native);
+  const { error, pending, setError, call } = commands;
   const unsupported = native ? null : supportIssue();
   useEffect(() => {
     if (native || !ownsConnection(snapshot.connection)) return;
@@ -59,31 +58,6 @@ export function useBridge() {
       unlisten?.();
     };
   }, [native]);
-  const call = useCallback(
-    async <T>(
-      command: string,
-      args?: Record<string, unknown>,
-    ): Promise<T | undefined> => {
-      if (inFlight.current.has(command)) return;
-      inFlight.current.add(command);
-      setError(null);
-      setPending(true);
-      try {
-        return native
-          ? await invoke<T>(command, args)
-          : await webBridge.call<T>(command, args);
-      } catch (reason) {
-        if (reason instanceof DOMException && reason.name === "AbortError")
-          return;
-        setError(String(reason));
-        return;
-      } finally {
-        inFlight.current.delete(command);
-        setPending(inFlight.current.size > 0);
-      }
-    },
-    [native],
-  );
   const refresh = useCallback(async () => {
     if (!native) {
       setSnapshot(webBridge.getSnapshot());
@@ -104,13 +78,52 @@ export function useBridge() {
     unsupported,
     call,
     refresh,
+    clearError: commands.clearError,
+  };
+}
+
+// Both production transport selection and browser fault fixtures use this dispatcher.
+export function useBridgeCommands(native: boolean, client = webBridge) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const inFlight = useRef(new Set<string>());
+  const call = useCallback(
+    async <T>(
+      command: string,
+      args?: Record<string, unknown>,
+    ): Promise<T | undefined> => {
+      if (inFlight.current.has(command)) return;
+      inFlight.current.add(command);
+      setError(null);
+      setPending(true);
+      try {
+        return native
+          ? await invoke<T>(command, args)
+          : await client.call<T>(command, args);
+      } catch (reason) {
+        if (reason instanceof DOMException && reason.name === "AbortError")
+          return;
+        setError(String(reason));
+        return;
+      } finally {
+        inFlight.current.delete(command);
+        setPending(inFlight.current.size > 0);
+      }
+    },
+    [native, client],
+  );
+  return {
+    error,
+    pending,
+    setError,
+    call,
     clearError: () => {
       setError(null);
       if (native)
         void invoke("dismiss_error").catch((reason) =>
           setError(String(reason)),
         );
-      else void webBridge.call("dismiss_error");
+      else void client.call("dismiss_error");
     },
   };
 }

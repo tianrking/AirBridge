@@ -77,8 +77,10 @@ automatic file resend is introduced.
 
 ## Verification — 2026-10-19
 
-The production TypeScript/Vite build, **33 frontend tests** and **11 Rust tests**
-passed. Added cases cover missing RSSI, handshake provenance, retained names,
+At the initial product-details milestone, the production TypeScript/Vite build,
+**33 frontend tests** and **11 Rust tests** passed. The subsequent
+[failure-path qualification](failure-recovery.md) expands the current coverage to
+**83 frontend tests**, **19 Rust tests** and six automated browser application flows. Added cases cover missing RSSI, handshake provenance, retained names,
 scanner-independent timestamps, multi-file receive receipts, native confirmation
 gating, progress semantics, history filtering and mismatched sender completions.
 The browser transfer tests use a virtual serial source and actual host test files;

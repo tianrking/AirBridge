@@ -178,7 +178,8 @@ const en = {
   receivedHash: "Received SHA256",
   outcomeHint:
     "This is the staged source hash. Destination hashing is a separate acceptance check.",
-  incomingHint: "The received file was checked before being published.",
+  incomingHint:
+    "Saved file bytes were read back and checked before completion was shown.",
   preferences: "Make yourself at home.",
   preferencesHelp: "A few thoughtful details for your setup.",
   language: "Language",
@@ -355,7 +356,7 @@ const zh: Copy = {
   sourceHash: "來源 SHA256",
   receivedHash: "接收檔案 SHA256",
   outcomeHint: "這是已暫存來源的雜湊值；目的端檔案仍需獨立驗收。",
-  incomingHint: "接收檔案已完成核對，才發布到接收資料夾。",
+  incomingHint: "顯示完成前，已重新讀取並核對實際儲存的檔案內容。",
   preferences: "讓使用更合你的習慣。",
   preferencesHelp: "為你的使用環境，調整幾個小細節。",
   language: "語言",
@@ -538,7 +539,7 @@ const es: Copy = {
   outcomeHint:
     "Este es el hash del origen preparado. La comprobación del destino es independiente.",
   incomingHint:
-    "El archivo se comprobó antes de publicarse en la carpeta de recepción.",
+    "Los bytes guardados se volvieron a leer y comprobar antes de mostrar la finalización.",
   preferences: "Hazlo tuyo.",
   preferencesHelp: "Unos pequeños ajustes para tu espacio.",
   language: "Idioma",

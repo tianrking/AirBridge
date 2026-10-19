@@ -618,6 +618,51 @@ describe("fail-closed receive and saved-data verification", () => {
       await receiver.stop();
     },
   );
+  it.each(
+    ["create", "write", "read"].flatMap((action) =>
+      ["receiving", "files_verified", "completed"].map((status) => ({
+        action,
+        status,
+      })),
+    ),
+  )(
+    "rejects receipt $action failure during $status",
+    async ({ action, status }) => {
+      const root = await directory(),
+        events: Event[] = [];
+      let count = 0;
+      const nth =
+        ["receiving", "files_verified", "completed"].indexOf(status) + 1;
+      const disk = new FaultDirectory(root, (a, name) => {
+        if (
+          name === "airbridge-receipt.json" &&
+          a === action &&
+          ++count === nth
+        )
+          throw new Error(`Injected receipt ${action} failure`);
+      });
+      const receiver = new Receiver(disk, (e) => events.push(e));
+      await expect(
+        (async () => {
+          await offer(receiver);
+          await finish(receiver);
+          await receiver.handle(ready);
+          await receiver.handle({
+            event: "transfer_complete",
+            transfer_id: "TEST-1",
+            host_committed: true,
+            response_written: true,
+          });
+        })(),
+      ).rejects.toThrow(/Injected receipt/);
+      expect(events.some((e) => e.event === "received")).toBe(false);
+      expect(events.find((e) => e.event === "incoming_failed")).toMatchObject({
+        uncertain: status === "completed",
+      });
+      await expect(receiver.handle(ready)).rejects.toThrow(/failed/);
+      await receiver.stop();
+    },
+  );
   it("detects persisted receipt corruption instead of trusting a resolved close", async () => {
     const root = await directory(),
       events: Event[] = [];

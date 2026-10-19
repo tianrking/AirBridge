@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "name": "cancel staging: duplicate clicks, pending controls and no replay",
+      "passed": true
+    },
+    {
+      "name": "active disconnect confirmation and uncertain history",
+      "passed": true
+    },
+    {
+      "name": "cleanup failure blocks connect and provides an explicit retry",
+      "passed": true
+    },
+    {
+      "name": "receive SHA256 failure stays failed and cannot save a success receipt",
+      "passed": true
+    },
+    {
+      "name": "final receipt failure remains uncertain with verified files preserved",
+      "passed": true
+    },
+    {
+      "name": "receive success requires native confirmation and saved readback",
+      "passed": true
+    }
+  ],
+  "serial": "synthetic only",
+  "storage": "real browser OPFS",
+  "hardware": false,
+  "native_airdrop": false
+}

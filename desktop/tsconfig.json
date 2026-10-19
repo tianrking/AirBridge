@@ -18,6 +18,7 @@
     "vite.config.ts",
     "tests/storage.ts",
     "tests/motion.tsx",
-    "tests/product.tsx"
+    "tests/product.tsx",
+    "tests/failures.tsx"
   ]
 }

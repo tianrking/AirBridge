@@ -25,7 +25,7 @@ de interfaz, almacenamiento real del navegador y puerto virtual han pasado;
 siguen pendientes el puerto real, la carpeta elegida por el usuario y la ida y
 vuelta nativa por AirDrop. La evidencia anterior del CLI no valida la ruta web.
 
-[Uso web y almacenamiento](desktop/README.web.md) · [Validación web](docs/web-qualification.md) · [Detalles de interfaz y origen de los datos](docs/product-details.md)
+[Uso web y almacenamiento](desktop/README.web.md) · [Validación web](docs/web-qualification.md) · [Detalles de interfaz y origen de los datos](docs/product-details.md) · [Recuperación y pruebas automáticas](docs/failure-recovery.md)
 
 ## Aplicación de escritorio
 

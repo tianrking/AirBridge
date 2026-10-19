@@ -40,7 +40,13 @@ import {
 } from "./presentation";
 import brand from "./brand.svg";
 export default function App() {
-  const bridge = useBridge();
+  return <BridgeApp bridge={useBridge()} />;
+}
+export function BridgeApp({
+  bridge,
+}: {
+  bridge: ReturnType<typeof useBridge>;
+}) {
   const { snapshot } = bridge;
   const [language, setLanguage] = useState<Language>(readLanguage);
   const [page, setPage] = useState<Page>("share");

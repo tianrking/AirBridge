@@ -1,0 +1,27 @@
+{
+  "status": "passed",
+  "storage": "real Chrome origin-private file system",
+  "files": [
+    {
+      "name": "empty.bin",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "測試-😀.bin",
+      "bytes": 4097,
+      "sha256": "e9893c07e509419a1ec218ebbf1c6308bf732248b8cf8cb2d1757e7782b755f1"
+    },
+    {
+      "name": "binary-262145.bin",
+      "bytes": 262145,
+      "sha256": "5d8e5555cdcfb3ece00bfa5de4340b2951a1af92423277c854969b18e03f4759"
+    }
+  ],
+  "closes_and_reopens_checked": true,
+  "commit_after_hash": true,
+  "waits_for_completion_record": true,
+  "serial_hardware_tested": false,
+  "native_airdrop_tested": false,
+  "directory": "airbridge-qualification-d28da517-2252-4a5f-8cb1-40fea1bf1ff7/AirBridge-d03f3da6-394c-4834-9092-839c4d3ee8db"
+}
