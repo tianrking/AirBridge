@@ -3,7 +3,10 @@
 Open the hosted **[HTTPS application](https://w0x7ce.eu/AirBridge/)** in desktop
 Chrome or Edge. See [deployment and permissions](../docs/pages.md). Tauri remains
 available in this same project. The production UI now has ambient motion by
-default before connecting; reduced-motion and manual pause are respected.
+default before connecting; reduced-motion and remembered manual pause are respected.
+Device arrivals, reversible departures, selection and transfer progress use a
+[shared motion system](../docs/discovery-motion.md), without changing the native
+confirmation or checked-file publication rules.
 
 ![Actual English browser interface, disconnected](../docs/images/web-en-disconnected.png)
 

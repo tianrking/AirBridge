@@ -39,6 +39,7 @@ import {
   ownsConnection,
 } from "./presentation";
 import brand from "./brand.svg";
+import { motionStyle } from "./motion";
 export default function App() {
   return <BridgeApp bridge={useBridge()} />;
 }
@@ -121,7 +122,7 @@ export function BridgeApp({
         ? copy.history
         : copy.preferences;
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={motionStyle}>
       <aside className="sidebar">
         <div className="brand">
           <img src={brand} alt="" />

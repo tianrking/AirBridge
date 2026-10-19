@@ -13,10 +13,10 @@ input {
 }
 button {
   transition:
-    background 160ms,
-    color 160ms,
-    box-shadow 160ms,
-    transform 160ms;
+    background var(--motion-feedback, 240ms) var(--motion-ease, ease-out),
+    color var(--motion-feedback, 240ms) var(--motion-ease, ease-out),
+    box-shadow var(--motion-feedback, 240ms) var(--motion-ease, ease-out),
+    transform var(--motion-feedback, 240ms) var(--motion-ease, ease-out);
 }
 button:not(:disabled):active {
   transform: translateY(1px);
@@ -102,6 +102,10 @@ summary:focus-visible {
 }
 .transfer-row:hover {
   background: #f4f7fc;
+}
+.transfer-row.state-completed .success-text {
+  animation: empty-arrive var(--motion-feedback, 240ms)
+    var(--motion-ease, ease-out) both;
 }
 .transfer-row .file-icon {
   border-radius: 12px;

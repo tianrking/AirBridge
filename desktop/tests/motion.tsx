@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { DiscoveryStage } from "../src/DiscoveryStage";
+import { TransferRow } from "../src/components";
+import { motionStyle } from "../src/motion";
 import { translations } from "../src/i18n";
 import type { Language, Peer, Transfer } from "../src/types";
 import "../src/styles.css";
@@ -24,6 +26,9 @@ function Preview() {
   const [connected, setConnected] = useState(true);
   const [language, setLanguage] = useState<Language>("en");
   const [progress, setProgress] = useState<number | null>(null);
+  const [phase, setPhase] = useState("sending");
+  const [unknownProgress, setUnknownProgress] = useState(false);
+  const [transferPeer, setTransferPeer] = useState<string | null>(mac.mac);
   const [resolving, setResolving] = useState<string | null>(null);
   const add = (peer: Peer) =>
     setPeers((old) =>
@@ -36,18 +41,18 @@ function Preview() {
           id: "UI-PREVIEW",
           direction: "send",
           name: "Synthetic preview",
-          peer: selected,
-          state: "sending",
+          peer: transferPeer,
+          state: phase,
           bytes: 100,
           done: progress,
-          progress_total: 100,
+          progress_total: unknownProgress ? 0 : 100,
           sha256: null,
           directory: null,
           error: null,
           updated: 0,
         };
   return (
-    <main className="motion-preview">
+    <main className="motion-preview" style={motionStyle}>
       <div className="preview-disclosure">
         <strong>INTERACTION PREVIEW</strong>
         <span>
@@ -71,6 +76,13 @@ function Preview() {
         copy={translations[language]}
         onSelect={(peer) => setSelected(peer.mac)}
       />
+      {transfer && (
+        <TransferRow
+          transfer={transfer}
+          copy={translations[language]}
+          onDetails={() => {}}
+        />
+      )}
       <div className="preview-controls" aria-label="Synthetic device controls">
         <button onClick={() => add(mac)}>Add Mac</button>
         <button onClick={() => add(phone)}>Add iPhone</button>
@@ -96,9 +108,53 @@ function Preview() {
           Toggle name lookup
         </button>
         <button
-          onClick={() => setProgress((old) => (old === null ? 62 : null))}
+          onClick={() => {
+            setTransferPeer(selected);
+            setPhase("sending");
+            setUnknownProgress(false);
+            setProgress((old) => (old === null ? 62 : null));
+          }}
         >
           Toggle transfer ring
+        </button>
+        <button
+          onClick={() => {
+            setUnknownProgress(false);
+            setPhase("sending");
+            setProgress(15);
+          }}
+        >
+          Progress 15%
+        </button>
+        <button
+          onClick={() => {
+            setUnknownProgress(false);
+            setPhase("sending");
+            setProgress(82);
+          }}
+        >
+          Progress 82%
+        </button>
+        <button
+          onClick={() => {
+            setUnknownProgress(true);
+            setPhase("connecting");
+            setProgress(0);
+          }}
+        >
+          Unknown progress
+        </button>
+        <button
+          onClick={() => {
+            setUnknownProgress(false);
+            setPhase("finishing");
+            setProgress(100);
+          }}
+        >
+          Await native confirmation
+        </button>
+        <button onClick={() => setPhase("completed")}>
+          Confirm synthetic completion
         </button>
         <button onClick={() => setConnected((old) => !old)}>
           {connected ? "Disconnect" : "Connect"}

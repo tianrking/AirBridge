@@ -48,13 +48,7 @@ export function PeerCard({
       : kind.includes("iphone")
         ? Smartphone
         : MonitorSmartphone;
-  const progress =
-    transfer && transfer.progress_total > 0
-      ? Math.min(
-          100,
-          Math.max(0, (100 * transfer.done) / transfer.progress_total),
-        )
-      : 0;
+  const progress = transfer ? progressOf(transfer) : null;
   return (
     <button
       className={`peer-card ${selected ? "selected" : ""}`}
@@ -72,25 +66,37 @@ export function PeerCard({
           <span className="peer-query-ring" aria-hidden="true" />
         ) : null}
         {transfer ? (
-          <svg
-            className={`peer-progress ${transfer.progress_total === 0 ? "indeterminate" : ""}`}
-            viewBox="0 0 112 112"
+          <span
+            className={`peer-progress-rotor ${progress === null ? "indeterminate" : ""}`}
             aria-hidden="true"
           >
-            <circle
-              cx="56"
-              cy="56"
-              r="52"
-              pathLength="100"
-              strokeDasharray={`${transfer.progress_total === 0 ? 23 : progress} 100`}
-            />
-          </svg>
-        ) : null}
-        {selected ? (
-          <span className="peer-selected">
-            <Check size={12} strokeWidth={3} />
+            <svg
+              className="peer-progress"
+              viewBox="0 0 112 112"
+              aria-hidden="true"
+            >
+              <circle
+                className="peer-progress-track"
+                cx="56"
+                cy="56"
+                r="52"
+                pathLength="100"
+              />
+              <circle
+                className="peer-progress-value"
+                cx="56"
+                cy="56"
+                r="52"
+                pathLength="100"
+                strokeDasharray={progress === null ? "24 100" : "100 100"}
+                strokeDashoffset={progress === null ? 0 : 100 - progress}
+              />
+            </svg>
           </span>
         ) : null}
+        <span className="peer-selected" aria-hidden="true">
+          <Check size={12} strokeWidth={3} />
+        </span>
       </span>
       <span className="peer-name">{deviceName}</span>
       <span className="peer-subtitle">

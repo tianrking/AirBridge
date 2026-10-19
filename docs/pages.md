@@ -57,15 +57,18 @@ HTML meta tag.
 
 ## Default motion
 
-The **production page itself** animates by default, with soft moving blue/lilac
+The **production page itself** animates by default, with clearer moving blue/lilac/cyan
 light and breathing concentric layers before connection. This is ambient
 decoration; the live status remains Disconnected and there are no fake peers.
 Connected discovery adds propagating signal rings; active transfers increase
 their tempo. The same interface and motion remain available in Tauri.
 
-The pause/resume control works even before connecting. Background tabs pause
+The pause/resume control works even before connecting and remembers an explicit
+pause across navigation/reload. Background tabs pause
 decorative motion, and the system's reduced-motion preference disables it.
-Animations use CSS transforms and opacity, without a JavaScript frame loop.
+Ambient animations use CSS transforms and opacity, without a JavaScript frame
+loop. A transfer tempo update changes the wave playback rate without resetting
+its phase. Device and progress transitions share the [motion system](discovery-motion.md).
 
 Browser automation covers the production disconnected animation, capability
 and permission failures, an actual denying policy header, embedded previews,

@@ -1,6 +1,7 @@
 import type { Peer } from "./types";
+import { MOTION } from "./motion";
 
-export const DEPARTURE_MS = 360;
+export const DEPARTURE_MS = MOTION.exit;
 export interface PresentedPeer {
   peer: Peer;
   leavingAt: number | null;
@@ -11,7 +12,7 @@ export function reconcilePresence(
   previous: PresentedPeer[],
   live: Peer[],
   now: number,
-  retention = DEPARTURE_MS,
+  retention: number = DEPARTURE_MS,
 ): PresentedPeer[] {
   const current = new Map(
     live.filter((p) => p.advertised).map((p) => [p.mac, p]),

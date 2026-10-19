@@ -9,6 +9,13 @@ import {
 } from "./presence";
 import { terminal, type Peer, type Transfer } from "./types";
 import brand from "./brand.svg";
+import {
+  motionStyle,
+  MOTION,
+  MOTION_PREFERENCE,
+  readMotionPaused,
+  reflowDelta,
+} from "./motion";
 import "./discovery.css";
 
 export function DiscoveryStage({
@@ -38,9 +45,10 @@ export function DiscoveryStage({
   const [reduced, setReduced] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
-  const [motionPaused, setMotionPaused] = useState(false);
+  const [motionPaused, setMotionPaused] = useState(readMotionPaused);
   const [hidden, setHidden] = useState(() => document.hidden);
   const grid = useRef<HTMLDivElement>(null);
+  const waves = useRef<HTMLDivElement>(null);
   const positions = useRef(new Map<string, { x: number; y: number }>());
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -102,13 +110,19 @@ export function DiscoveryStage({
         node.animate &&
         (Math.abs(old.x - at.x) > 1 || Math.abs(old.y - at.y) > 1)
       ) {
+        const value = getComputedStyle(node).transform;
+        const matrix =
+          value === "none"
+            ? new DOMMatrixReadOnly()
+            : new DOMMatrixReadOnly(value);
+        const delta = reflowDelta(old, at, { x: matrix.m41, y: matrix.m42 });
         node.getAnimations().forEach((animation) => animation.cancel());
         node.animate(
           [
-            { transform: `translate(${old.x - at.x}px, ${old.y - at.y}px)` },
+            { transform: `translate(${delta.x}px, ${delta.y}px)` },
             { transform: "translate(0, 0)" },
           ],
-          { duration: 420, easing: "cubic-bezier(.22,1,.36,1)" },
+          { duration: MOTION.reflow, easing: MOTION.ease },
         );
       }
       next.set(key, at);
@@ -121,6 +135,19 @@ export function DiscoveryStage({
   );
   const activeTransfer =
     connected && (transferring || (transfer && !terminal(transfer.state)));
+  useLayoutEffect(() => {
+    // Change speed without restarting the wave or changing its displayed phase.
+    const rate = activeTransfer ? 4 / 3 : 1;
+    for (const span of waves.current?.children ?? []) {
+      for (const animation of span.getAnimations()) {
+        if (
+          animation instanceof CSSAnimation &&
+          animation.animationName === "signal-expand"
+        )
+          animation.updatePlaybackRate(rate);
+      }
+    }
+  }, [activeTransfer, connected, reduced]);
   const signal = !connected
     ? "idle"
     : activeTransfer
@@ -144,6 +171,7 @@ export function DiscoveryStage({
       data-signal={signal}
       data-motion={motion}
       aria-label={copy.nearby}
+      style={motionStyle}
     >
       <div className="discovery-header">
         <div className="discovery-label">
@@ -163,7 +191,18 @@ export function DiscoveryStage({
             title={motionLabel}
             aria-pressed={motionPaused || reduced}
             disabled={reduced}
-            onClick={() => setMotionPaused((previous) => !previous)}
+            onClick={() => {
+              const next = !motionPaused;
+              setMotionPaused(next);
+              try {
+                localStorage.setItem(
+                  MOTION_PREFERENCE,
+                  next ? "paused" : "running",
+                );
+              } catch {
+                /* Motion still works when browser storage is blocked. */
+              }
+            }}
           >
             {motionPaused || reduced ? <Play size={13} /> : <Pause size={13} />}
           </button>
@@ -173,6 +212,7 @@ export function DiscoveryStage({
         <div className="ambient-field" aria-hidden="true">
           <span />
           <span />
+          <span />
         </div>
         <div className="discovery-rings" aria-hidden="true">
           <span />
@@ -180,7 +220,7 @@ export function DiscoveryStage({
           <span />
           <span />
         </div>
-        <div className="signal-waves" aria-hidden="true">
+        <div className="signal-waves" aria-hidden="true" ref={waves}>
           <span />
           <span />
           <span />
@@ -216,7 +256,10 @@ export function DiscoveryStage({
                     resolving={resolving === row.peer.mac && available}
                     copy={copy}
                     transfer={
-                      transfer?.peer === row.peer.mac ? transfer : undefined
+                      transfer?.peer === row.peer.mac &&
+                      !terminal(transfer.state)
+                        ? transfer
+                        : undefined
                     }
                     onSelect={() => {
                       if (available) onSelect(row.peer);

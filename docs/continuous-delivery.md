@@ -33,7 +33,10 @@ background pause logic; actual OS suspension remains a hardware-session check.
 First hosted acceptance: [CI run 39235593497](https://github.com/tianrking/AirBridge/actions/runs/39235593497)
 passed all three jobs for `02dfedd`. It ran 83 frontend unit tests, the initial
 three browser tests, 26 Python tests, 19 Rust tests and 346 C++ protocol checks.
-The current motion extension brings the browser suite to seven tests.
+The current motion and browser-access extensions bring the suite to 93 frontend
+unit tests and 20 browser tests. The additional motion checks exercise reversible
+departure, interpolated ring progress, selection, unknown progress, phase-preserving
+wave tempo and pause retention across navigation/reload.
 
 ## Release behavior
 
