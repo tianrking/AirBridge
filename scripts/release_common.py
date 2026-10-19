@@ -48,7 +48,7 @@ def verify_archive(path, version, commit, component):
         manifest = json.loads(z.read('MANIFEST.json'))
         if (manifest.get('version'), manifest.get('commit')) != (version, commit):
             raise ValueError('Archive source/version mismatch')
-        if component != 'web' and manifest.get('component') != component:
+        if manifest.get('component') != component:
             raise ValueError('Wrong release component')
         if set(names) != set(manifest['files']) | {'MANIFEST.json'}:
             raise ValueError('Archive manifest coverage mismatch')

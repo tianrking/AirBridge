@@ -95,3 +95,54 @@ test("public demo cancellation never reports native delivery", async ({
     page.getByText(messages.en.ui.demoComplete, { exact: true }),
   ).toHaveCount(0);
 });
+
+test("demo reconnect clears authorization and activity cannot export a file", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const denied = () => {
+      throw Error("Demo requested a real device or disk operation");
+    };
+    Object.defineProperty(navigator, "serial", {
+      configurable: true,
+      value: { getPorts: denied, requestPort: denied },
+    });
+    Object.defineProperty(window, "showDirectoryPicker", {
+      configurable: true,
+      value: denied,
+    });
+    Object.defineProperty(window, "showOpenFilePicker", {
+      configurable: true,
+      value: denied,
+    });
+  });
+  await page.goto("http://127.0.0.1:1431/?demo=1");
+  await page.locator(".peer-card").first().click();
+  await page
+    .getByRole("button", { name: messages.en.ui.authorizePeer, exact: true })
+    .click();
+  await page.getByRole("button", { name: /^Activity(?: \d+)?$/ }).click();
+  await expect(
+    page.getByRole("button", {
+      name: messages.en.ui.exportActivity,
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: messages.en.ui.share, exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: messages.en.ui.disconnect, exact: true })
+    .click();
+  await expect(page.locator(".discovery-stage")).toHaveAttribute(
+    "data-signal",
+    "idle",
+  );
+  await page
+    .getByRole("button", { name: messages.en.ui.connect, exact: true })
+    .click();
+  await expect(page.locator(".peer-card")).toHaveCount(2);
+  await expect(page.locator(".receive-permissions")).not.toContainText(
+    messages.en.ui.authorizedPeer,
+  );
+});

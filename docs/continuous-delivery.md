@@ -1,6 +1,6 @@
 # Automated quality and release gates
 
-Every push and pull request runs [CI](../.github/workflows/ci.yml), including
+Every branch push and pull request runs [CI](../.github/workflows/ci.yml), including
 documentation-only changes. The same [reusable quality suite](../.github/workflows/quality.yml)
 runs again on release tags. There are no skipped-test overrides, success-on-retry
 policies, path filters or `continue-on-error` test steps.
@@ -35,8 +35,7 @@ background pause logic; actual OS suspension remains a hardware-session check.
 First hosted acceptance: [CI run 39235593497](https://github.com/tianrking/AirBridge/actions/runs/39235593497)
 passed all three jobs for `02dfedd`. It ran 83 frontend unit tests, the initial
 three browser tests, 26 Python tests, 19 Rust tests and 346 C++ protocol checks.
-The motion, browser-access and localization extensions bring the suite to 103 frontend
-unit tests and 38 browser tests. The five-language/two-theme matrix checks desktop
+The public-release suite includes 106 frontend unit tests and 45 browser tests. The five-language/two-theme matrix checks desktop
 and mobile layouts, readable controls, computed text contrast, permission denial,
 RTL inspectors and preference persistence; its screenshots are included in the
 report. See [locale and theme acceptance](localization-and-appearance.md). The additional motion checks exercise reversible
@@ -64,7 +63,9 @@ pinned to immutable revisions. PRs cannot publish and no manual bypass is includ
 Python policy checks execute the actual four-result gate with every individual
 failure, cancellation, skip and absent result. Browser tests also exercise the
 public demo in all five languages while throwing on any real serial/file request.
-The desktop is unsigned. Actual physical flashing, first-boot identity, RF/native
+Windows build inputs are cached by the locked dependency graph; the build and
+checks still run on every invocation. Version tags run the release suite once
+instead of also duplicating the ordinary branch workflow. The desktop is unsigned. Actual physical flashing, first-boot identity, RF/native
 AirDrop interoperability, installer UX on a clean Windows system and browser
 folder-picker/native transfer remain separate manual qualification gates.
 [Release notes](release-notes-v0.0.1.md) state these boundaries. Owners can still

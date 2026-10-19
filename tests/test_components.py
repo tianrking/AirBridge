@@ -55,7 +55,7 @@ class Components(unittest.TestCase):
             with self.assertRaises(ValueError):
                 archive(self.root, 'bad.zip', 'web', '0.0.1', self.sha, {path: b'x'})
         z = archive(self.root, 'good.zip', 'windows-x64', '0.0.1', self.sha, {'AirBridge.exe': b'fake'})
-        for component, sha in [('esp32s3', self.sha), ('windows-x64', 'b' * 40)]:
+        for component, sha in [('esp32s3', self.sha), ('web', self.sha), ('windows-x64', 'b' * 40)]:
             with self.assertRaises(ValueError):
                 verify_archive(z, '0.0.1', sha, component)
 

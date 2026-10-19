@@ -23,7 +23,7 @@ def package(root, tag, commit, output):
         raise ValueError('Symlinks are not allowed in release assets')
     contents = {p.relative_to(dist).as_posix(): p.read_bytes() for p in files}
     contents['README.md'] = (root / 'desktop/README.web.md').read_bytes()
-    manifest = {'version': version, 'commit': commit, 'hardware_qualified_by_ci': False,
+    manifest = {'component': 'web', 'version': version, 'commit': commit, 'hardware_qualified_by_ci': False,
                 'files': {name: {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
                           for name, data in contents.items()}}
     contents['MANIFEST.json'] = (json.dumps(manifest, indent=2) + '\n').encode()

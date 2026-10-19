@@ -4,8 +4,8 @@ import type { SelectedFile, Snapshot, Transfer } from "./types";
 
 // Deliberately separate from WebBridge: the public tour never constructs a
 // serial session or asks for a file/directory handle. All state is disposable.
-export function useDemoBridge(): ReturnType<typeof useBridge> {
-  const [snapshot, setSnapshot] = useState<Snapshot>(() => ({
+function initialDemo(): Snapshot {
+  return {
     revision: 0,
     connection: "connected",
     can_resolve: false,
@@ -62,7 +62,10 @@ export function useDemoBridge(): ReturnType<typeof useBridge> {
         updated: Date.now() - 25000,
       },
     ],
-  }));
+  };
+}
+export function useDemoBridge(): ReturnType<typeof useBridge> {
+  const [snapshot, setSnapshot] = useState<Snapshot>(initialDemo);
   const active = snapshot.transfers.some((t) => t.state === "sending");
   useEffect(() => {
     if (!active) return;
@@ -91,6 +94,7 @@ export function useDemoBridge(): ReturnType<typeof useBridge> {
     args: Record<string, unknown> = {},
   ): Promise<T | undefined> => {
     let result: unknown = null;
+    if (command === "connect_bridge") setSnapshot(initialDemo());
     if (command === "choose_file")
       result = {
         id: "DEMO-SOURCE",

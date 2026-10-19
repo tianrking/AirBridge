@@ -117,6 +117,15 @@ jobs:
         with:
           name: tested-web
           path: desktop/dist
+      - name: Reuse checked Rust build inputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            work/desktop-target
+          key: desktop-windows-x64-v1-${{ hashFiles('desktop/Cargo.lock') }}
       - name: Build installer using the exact tested frontend
         working-directory: desktop
         shell: pwsh

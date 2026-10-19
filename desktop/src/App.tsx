@@ -556,6 +556,7 @@ export function BridgeApp({
             </>
           ) : page === "activity" ? (
             <ActivityPanel
+              allowExport={!demo}
               transfers={snapshot.transfers}
               language={language}
               copy={copy}

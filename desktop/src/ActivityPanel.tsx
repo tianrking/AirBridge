@@ -10,16 +10,19 @@ export function ActivityPanel({
   language,
   copy,
   onDetails,
+  allowExport = true,
 }: {
   transfers: Transfer[];
   language: Language;
   copy: Copy;
   onDetails: (id: string) => void;
+  allowExport?: boolean;
 }) {
   const [filter, setFilter] = useState<ActivityFilter>("all");
   const [query, setQuery] = useState("");
   const visible = filteredTransfers(transfers, filter, query);
   function exportActivity() {
+    if (!allowExport) return;
     const url = URL.createObjectURL(
       new Blob(
         [
@@ -66,7 +69,7 @@ export function ActivityPanel({
         </div>
         <button
           className="secondary compact"
-          disabled={!visible.length}
+          disabled={!allowExport || !visible.length}
           onClick={exportActivity}
         >
           <Download size={14} />

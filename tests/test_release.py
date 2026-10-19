@@ -25,7 +25,7 @@ class ReleasePolicy(unittest.TestCase):
     def test_ci_runs_every_push_and_pull_request_without_path_filters(self):
         ci = self.workflow('ci.yml')
         self.assertEqual(set(ci['on']), {'push', 'pull_request', 'workflow_dispatch'})
-        self.assertFalse(ci['on']['push'])
+        self.assertEqual(ci['on']['push'], {'branches': ['**']})
         self.assertFalse(ci['on']['pull_request'])
         self.assertEqual(ci['jobs']['checks']['uses'], './.github/workflows/quality.yml')
 
