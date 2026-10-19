@@ -43,6 +43,7 @@ def package(root, build, tag, commit, output):
         contents['AirBridge-esp32s3.bin'] = merged.read_bytes()
     contents['flash.py'] = (root / 'scripts/flash-release.py').read_bytes()
     contents['README.md'] = (root / 'docs/firmware-release.md').read_bytes()
+    contents['LICENSE'] = (root / 'LICENSE').read_bytes()
     contents['BUILD.json'] = (json.dumps({'version': version, 'commit': commit, 'idf': 'v6.1', 'target': 'ESP32-S3 N16R8',
         'flash_bytes': 16777216, 'psram_bytes': 8388608, 'identity': 'generated per device at first boot',
         'incoming_policy': 'explicit session peer authorization', 'hardware_tested_by_ci': False,

@@ -27,7 +27,8 @@ def package(root, target, tag, commit, output):
     if pe_machine(binary) != 0x8664 or pe_machine(installers[0].read_bytes()) not in (0x14c, 0x8664):
         raise ValueError('Wrong Windows executable architecture')
     result = archive(output, f'AirBridge-windows-x64-{tag}.zip', 'windows-x64', version, commit,
-                     {'AirBridge.exe': binary, 'README.md': (root / 'desktop/README.md').read_bytes()})
+                     {'AirBridge.exe': binary, 'README.md': (root / 'docs/windows-release.md').read_bytes(),
+                      'LICENSE': (root / 'LICENSE').read_bytes()})
     shutil.copyfile(installers[0], output / f'AirBridge-{tag}-windows-x64-setup.exe')
     return result
 

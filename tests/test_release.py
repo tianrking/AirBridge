@@ -125,7 +125,9 @@ class WebPackage(unittest.TestCase):
         (dist / 'index.html').write_text('<script src="main.js"></script>')
         (dist / 'main.js').write_bytes(b'console.log("checked")')
         (self.root / 'desktop/package.json').write_text('{"version":"0.4.0"}')
-        (self.root / 'desktop/README.web.md').write_text('Serve over localhost.')
+        (self.root / 'docs').mkdir()
+        (self.root / 'docs/web-release.md').write_text('Serve over localhost.')
+        (self.root / 'LICENSE').write_text('Test license')
 
     def package(self, tag='v0.4.0', commit='a' * 40):
         return packager.package(self.root, tag, commit, self.root / 'release')
@@ -137,6 +139,7 @@ class WebPackage(unittest.TestCase):
             manifest = json.loads(z.read('MANIFEST.json'))
             self.assertFalse(manifest['hardware_qualified_by_ci'])
             self.assertEqual(manifest['commit'], 'a' * 40)
+            self.assertEqual(z.read('LICENSE'), b'Test license')
             for name, record in manifest['files'].items():
                 data = z.read(name)
                 self.assertEqual(record, {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
