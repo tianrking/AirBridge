@@ -87,6 +87,8 @@ appearance precedence. `npm run test:browser` checks:
   reload, receive-folder guidance and localized permission-denial recovery.
 - No horizontal overflow or clipped setting labels; computed muted text contrast
   against the setting-card background is at least **4.5:1** in each combination.
+  Checked-receive cards also measure filename, byte-label and SHA256 contrast
+  against their actual card surface, catching leftover light backgrounds in dark mode.
 - The production device and checked-receive dialogs using clearly disclosed,
   development-only synthetic data, including LTR MAC/SHA256 rendering in Arabic.
 - Dynamic system-scheme changes, explicit overrides, animation-pause retention,

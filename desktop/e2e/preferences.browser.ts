@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "./test";
 import { locales, messages, fileCount } from "../src/i18n";
 
@@ -30,6 +30,31 @@ async function capture(page: Page, name: string) {
   const path = test.info().outputPath(`${name}.png`);
   await page.screenshot({ path });
   await test.info().attach(name, { path, contentType: "image/png" });
+}
+
+async function readable(text: Locator, surface: string) {
+  const contrast = await text.evaluate((el, selector) => {
+    const luminance = (css: string) => {
+      const rgb = css
+        .match(/[\d.]+/g)!
+        .slice(0, 3)
+        .map(Number)
+        .map((n) => {
+          const v = n / 255;
+          return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        });
+      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+    };
+    const foreground = luminance(getComputedStyle(el).color);
+    const background = luminance(
+      getComputedStyle(el.closest(selector)!).backgroundColor,
+    );
+    return (
+      (Math.max(foreground, background) + 0.05) /
+      (Math.min(foreground, background) + 0.05)
+    );
+  }, surface);
+  expect(contrast, `Readable text on ${surface}`).toBeGreaterThanOrEqual(4.5);
 }
 
 for (const { id, dir } of locales)
@@ -168,6 +193,13 @@ for (const { id, dir } of locales)
       await expect(
         page.getByRole("dialog").locator("code[dir=ltr]").first(),
       ).toHaveText("a".repeat(64));
+      const verified = page
+        .getByRole("dialog")
+        .locator(".verified-file")
+        .first();
+      await readable(verified.locator("summary > span"), ".verified-file");
+      await readable(verified.locator("summary small"), ".verified-file");
+      await readable(verified.locator("code"), ".verified-file");
       await fits(page);
       await capture(page, `${id}-${theme}-checked-receive-mobile`);
     });
