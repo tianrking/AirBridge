@@ -12,6 +12,21 @@
 
 AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows mediante un puerto serie. Su núcleo portátil en C++17 implementa las tramas AWDL, la sincronización y el análisis del protocolo; ESP-IDF 6.1 proporciona el backend de radio. La aplicación de escritorio Tauri 2 utiliza React, TypeScript y un único actor serie en Rust.
 
+## Aplicación web
+
+La misma interfaz React/TypeScript admite ahora Web Serial directo. Se conserva
+la aplicación Tauri/Rust. En Chrome o Edge de escritorio, ejecuta `npm ci` y
+`npm run dev` desde `desktop` y abre **http://127.0.0.1:1420/**. Elige una carpeta
+de recepción y después el COM4 verificado. Requiere firmware con `hardware_id`.
+
+Incluye nombres nativos, selección de destinatario, archivos bidireccionales,
+progreso y SHA256 de los archivos guardados tras cerrarlos y reabrirlos. Las pruebas
+de interfaz, almacenamiento real del navegador y puerto virtual han pasado;
+siguen pendientes el puerto real, la carpeta elegida por el usuario y la ida y
+vuelta nativa por AirDrop. La evidencia anterior del CLI no valida la ruta web.
+
+[Uso web y almacenamiento](desktop/README.web.md) · [Validación web](docs/web-qualification.md)
+
 ## Aplicación de escritorio
 
 Incluye selección de dispositivos, diálogos nativos de archivos y carpetas, progreso bidireccional, cancelación, ubicación de recepción y detalles de transferencia. Inglés por defecto, con chino tradicional y español en Ajustes. Los nombres proceden de `/Discover`; los nombres sin resolver se indican explícitamente.
@@ -123,7 +138,7 @@ independiente. Los resultados fallidos o inciertos nunca se reenvían automátic
 
 ## Verificación
 
-**Comprobaciones del protocolo portátil: 281.** **Pruebas del host de Windows: 20.**
+**Comprobaciones del protocolo portátil: 346.** **Pruebas del host de Windows: 20.**
 
 Las pruebas portátiles cubren tramas malformadas, límites, sincronización y datos del protocolo. Las pruebas del equipo comprueban fallos de desplazamiento, hash y publicación duradera. Las evidencias de hardware se registran por separado.
 

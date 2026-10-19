@@ -1035,3 +1035,75 @@ footer {
   flex: 1;
   min-height: 177px;
 }
+.browser-location {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: #68788e;
+}
+@media (max-width: 720px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .sidebar {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 16px;
+    gap: 16px;
+    border-right: 0;
+    border-bottom: 1px solid #e9edf2;
+  }
+  .sidebar nav {
+    display: flex;
+    margin: 0;
+    gap: 4px;
+  }
+  .sidebar-bottom {
+    display: none;
+  }
+  .brand {
+    padding: 0;
+    font-size: 18px;
+  }
+  .brand > span {
+    display: none;
+  }
+  .nav-item {
+    padding: 8px;
+    gap: 5px;
+    height: 38px;
+  }
+  .topbar {
+    padding: 12px 18px;
+    height: auto;
+  }
+  .page-content {
+    padding: 24px 18px;
+  }
+  .share-columns {
+    grid-template-columns: 1fr;
+  }
+  .page-heading h1 {
+    font-size: 27px;
+  }
+  .bridge-strip {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .bridge-strip > div {
+    flex: 1;
+    min-width: 140px;
+  }
+  .setting-card {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .peer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 460px) {
+  .nav-item > svg {
+    display: none;
+  }
+}

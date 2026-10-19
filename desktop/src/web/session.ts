@@ -114,7 +114,7 @@ export class Session {
           );
           reject(error);
           this.fail(error);
-          void this.close();
+          void this.close().catch(() => {});
         }, 5000);
         this.pending.set(sequence, { resolve, reject, timer });
         void this.write(bytes).catch((error) => {
@@ -203,7 +203,7 @@ export class Session {
       if (!this.closing) {
         this.fail(error instanceof Error ? error : new Error(String(error)));
         // Avoid awaiting close() from the reader that close() waits for.
-        void this.close();
+        void this.close().catch(() => {});
       }
     } finally {
       this.reader?.releaseLock();
@@ -227,11 +227,12 @@ export class Session {
       }
       this.pending.clear();
       this.waiting.clear();
+      // Interrupt a blocked ACK write before waiting for its reader task.
+      const aborted = this.writer?.abort().catch(() => {});
       await this.reader?.cancel().catch(() => {});
       await this.readTask;
       await this.receiver.stop();
-      // abort releases a blocked pending write before releasing the port lock.
-      await this.writer?.abort().catch(() => {});
+      await aborted;
       await this.writeTail.catch(() => {});
       this.writer?.releaseLock();
       this.writer = undefined;

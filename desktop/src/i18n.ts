@@ -1,4 +1,27 @@
 import type { Language } from "./types";
+export const webTranslations: Record<
+  Language,
+  { help: string; noFolder: string; receipt: string; prepare: string }
+> = {
+  en: {
+    help: "Web Serial · Choose a receive folder, then connect the verified COM4 bridge. Keep this tab open and the computer awake during transfers. New firmware with hardware identity support is required.",
+    noFolder: "Choose a receive folder before connecting.",
+    receipt: "Save receipt",
+    prepare: "Choose receive folder",
+  },
+  "zh-Hant": {
+    help: "Web Serial · 先選擇接收資料夾，再連接已核對的 COM4 橋接器。傳輸時請保持分頁開啟及電腦喚醒。需要支援硬體識別的新韌體。",
+    noFolder: "連線前，請先選擇接收資料夾。",
+    receipt: "儲存驗證收據",
+    prepare: "選擇接收資料夾",
+  },
+  es: {
+    help: "Web Serial · Elige una carpeta de recepción y conecta el puente COM4 verificado. Mantén esta pestaña abierta y el equipo despierto durante las transferencias. Requiere firmware con identificación de hardware.",
+    noFolder: "Elige una carpeta de recepción antes de conectar.",
+    receipt: "Guardar comprobante",
+    prepare: "Elegir carpeta de recepción",
+  },
+};
 const en = {
   share: "Share",
   activity: "Activity",

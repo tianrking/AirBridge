@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { PeerCard, TransferDetails, TransferRow } from "./components";
-import { readLanguage, translations } from "./i18n";
+import { readLanguage, translations, webTranslations } from "./i18n";
 import {
   formatBytes,
   terminal,
@@ -38,6 +38,7 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const copy = translations[language];
+  const webCopy = webTranslations[language];
   const connected = snapshot.connection === "connected";
   const peers = snapshot.peers.filter((peer) => peer.advertised);
   const target = peers.find((peer) => peer.mac === selectedPeer);
@@ -176,7 +177,7 @@ export default function App() {
           {!bridge.native ? (
             <div className="preview-note">
               <CircleHelp size={16} />
-              {copy.noDesktop}
+              {bridge.unsupported ?? webCopy.help}
             </div>
           ) : null}
           {page === "share" ? (
@@ -198,12 +199,17 @@ export default function App() {
                   }
                   disabled={
                     bridge.pending ||
+                    Boolean(bridge.unsupported) ||
                     snapshot.connection === "connecting" ||
                     Boolean(outgoing)
                   }
                   onClick={() =>
                     void bridge.call(
-                      connected ? "disconnect_bridge" : "connect_bridge",
+                      connected
+                        ? "disconnect_bridge"
+                        : !bridge.native && !snapshot.receive_directory
+                          ? "choose_receive_folder"
+                          : "connect_bridge",
                     )
                   }
                 >
@@ -214,7 +220,9 @@ export default function App() {
                     ? copy.disconnect
                     : snapshot.connection === "connecting"
                       ? copy.connecting
-                      : copy.connect}
+                      : !bridge.native && !snapshot.receive_directory
+                        ? webCopy.prepare
+                        : copy.connect}
                 </button>
               </section>
               <section className="devices-section">
@@ -237,6 +245,7 @@ export default function App() {
                         key={peer.mac}
                         peer={peer}
                         selected={selectedPeer === peer.mac}
+                        resolving={snapshot.resolving_peer === peer.mac}
                         copy={copy}
                         onSelect={() => {
                           setSelectedPeer(peer.mac);
@@ -345,16 +354,32 @@ export default function App() {
                     <strong>AirBridge PC</strong>
                     <span className={`dot ${connected ? "green" : "gray"}`} />
                   </div>
+                  {!bridge.native ? (
+                    <p className="browser-location">
+                      {snapshot.receive_directory || webCopy.noFolder}
+                    </p>
+                  ) : null}
                   <button
                     className="text-button"
+                    disabled={
+                      !bridge.native &&
+                      (connected ||
+                        bridge.pending ||
+                        Boolean(bridge.unsupported))
+                    }
                     onClick={() =>
-                      void bridge.call("open_receive_folder", {
-                        transferId: null,
-                      })
+                      void bridge.call(
+                        bridge.native
+                          ? "open_receive_folder"
+                          : "choose_receive_folder",
+                        {
+                          transferId: null,
+                        },
+                      )
                     }
                   >
                     <FolderOpen size={16} />
-                    {copy.openFolder}
+                    {bridge.native ? copy.openFolder : copy.changeFolder}
                     <ChevronRight size={14} />
                   </button>
                 </section>
@@ -439,7 +464,9 @@ export default function App() {
                 </div>
                 <div className="setting-copy">
                   <h2>{copy.receiveFolder}</h2>
-                  <p className="folder-path">{snapshot.receive_directory}</p>
+                  <p className="folder-path">
+                    {snapshot.receive_directory || webCopy.noFolder}
+                  </p>
                   {connected ? <p>{copy.disconnectFolder}</p> : null}
                 </div>
                 <button
@@ -472,7 +499,11 @@ export default function App() {
                   </div>
                   <div>
                     <dt>{copy.transport}</dt>
-                    <dd>USB Serial/JTAG · COM4</dd>
+                    <dd>
+                      {bridge.native
+                        ? "USB Serial/JTAG · COM4"
+                        : "Web Serial · USB Serial/JTAG"}
+                    </dd>
                   </div>
                 </dl>
                 <div className="compatibility">
@@ -496,6 +527,7 @@ export default function App() {
         <TransferDetails
           transfer={detail}
           copy={copy}
+          folderLabel={bridge.native ? copy.openFolder : webCopy.receipt}
           onClose={() => setDetailId(null)}
           onFolder={() =>
             void bridge.call("open_receive_folder", { transferId: detail.id })

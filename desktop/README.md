@@ -1,5 +1,9 @@
 # AirBridge desktop
 
+The browser edition reuses this React application and now has a direct Web Serial
+backend. See [AirBridge Web](README.web.md). The Tauri/Rust path below remains
+available in the same repository; it is not replaced or launched by the browser.
+
 Tauri 2, React, TypeScript and Rust. The application talks directly to the ESP32-S3;
 it does not launch a Python transfer process or use the PC's Wi-Fi adapter for AWDL.
 

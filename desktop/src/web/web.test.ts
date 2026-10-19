@@ -531,7 +531,7 @@ describe("browser workflow state", () => {
         port.emit({
           event: "peer_resolved",
           mac: peer,
-          name_b64: encodedName("Tienjui的MacBook Pro"),
+          name_b64: encodedName("測試 MacBook Pro"),
         });
         port.emit({
           event: "resolution_complete",
@@ -544,7 +544,7 @@ describe("browser workflow state", () => {
     await bridge.call("resolve_peer", { peer });
     await vi.waitFor(() => expect(bridge.snapshot.resolving_peer).toBe(null));
     expect(bridge.snapshot.peers[0]).toMatchObject({
-      name: "Tienjui的MacBook Pro",
+      name: "測試 MacBook Pro",
       name_source: "airdrop_discover",
     });
     vi.useFakeTimers();
@@ -610,6 +610,61 @@ describe("browser workflow state", () => {
     await bridge.call("send_file", { peer, fileId: selected.id });
     await vi.waitFor(() =>
       expect(bridge.snapshot.transfers[0].state).toBe("uncertain"),
+    );
+    expect(port.records.filter((r) => r.includes(" SEND "))).toHaveLength(1);
+    await bridge.call("disconnect_bridge");
+  });
+  it("cancels staging without issuing native SEND or replaying commands", async () => {
+    const { bridge, port } = await connected();
+    const selected = await bridge.call<{ id: string }>("choose_file");
+    let cancellation: Promise<unknown> | undefined;
+    port.onCommand = (record) => {
+      if (record.includes(" DATA ") && !cancellation)
+        cancellation = bridge.call("cancel_transfer");
+    };
+    await bridge.call("send_file", { peer, fileId: selected.id });
+    await vi.waitFor(() =>
+      expect(bridge.snapshot.transfers[0].state).toBe("cancelled"),
+    );
+    await cancellation;
+    expect(port.records.filter((r) => r.includes(" SEND "))).toHaveLength(0);
+    expect(port.records.filter((r) => r.includes(" CANCEL "))).toHaveLength(1);
+    await bridge.call("disconnect_bridge");
+  });
+  it("cancels a native deadline cooperatively while keeping its destination result uncertain", async () => {
+    const { bridge, port } = await connected();
+    const selected = await bridge.call<{ id: string }>("choose_file");
+    vi.useFakeTimers();
+    let sending = false;
+    port.onCommand = (record) => {
+      if (record.includes(" SEND ")) sending = true;
+    };
+    await bridge.call("send_file", { peer, fileId: selected.id });
+    await vi.waitFor(() => expect(sending).toBe(true));
+    await vi.advanceTimersByTimeAsync(420001);
+    await vi.waitFor(() =>
+      expect(bridge.snapshot.transfers[0].state).toBe("uncertain"),
+    );
+    expect(port.records.filter((r) => r.includes(" SEND "))).toHaveLength(1);
+    expect(port.records.filter((r) => r.includes(" CANCEL "))).toHaveLength(1);
+    await bridge.call("disconnect_bridge");
+  });
+  it("keeps an explicit native refusal failed instead of completed or automatically retried", async () => {
+    const { bridge, port } = await connected();
+    const selected = await bridge.call<{ id: string }>("choose_file");
+    port.onCommand = (record) => {
+      if (record.includes(" SEND "))
+        port.emit({
+          event: "outgoing_complete",
+          transfer_id: bridge.snapshot.transfers[0].id,
+          success: false,
+          error: -13,
+          http_status: 403,
+        });
+    };
+    await bridge.call("send_file", { peer, fileId: selected.id });
+    await vi.waitFor(() =>
+      expect(bridge.snapshot.transfers[0].state).toBe("failed"),
     );
     expect(port.records.filter((r) => r.includes(" SEND "))).toHaveLength(1);
     await bridge.call("disconnect_bridge");

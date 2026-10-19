@@ -17,6 +17,7 @@ diagnostic does not substitute for native file acceptance.
 | Serial recovery | Reject stale sessions, conflicting sequences, CRC damage and oversized records; reopen without unsafe resend | Hardware close/reopen tests and rejection tests |
 | Failure recovery | Report disconnect, restart, declined consent, timeout, unsupported size and disk failure; keep incomplete files distinct | Injected failures followed by a successful native retry |
 | Desktop | Tauri 2, React, TypeScript and Rust; English default with Traditional Chinese and Spanish | Real backend-connected UI walkthrough and keyboard operation |
+| Web | Shared React interface, one Web Serial owner, explicit directory access and saved-file readback hashes | Real browser COM4 handshake, selected-directory publication and native Apple file roundtrip |
 | File UX | Select an actual peer, choose files, show preparation/consent/transfer/completion and receive location | Native send/receive from the packaged application |
 | Delivery | Versioned builds, dependency locks, documented flashing and startup, local diagnostics with private data excluded | Clean-machine build/package checks and release manifest |
 
@@ -29,7 +30,9 @@ diagnostic does not substitute for native file acceptance.
    Initial staging is explicitly bounded to 1 MiB. Larger files must be rejected
    before network transmission until streaming is implemented and qualified.
 3. One Rust serial actor for commands, incoming records and outgoing operations.
-   The React application must never open serial devices or handle private keys.
+   The Tauri renderer delegates serial ownership to Rust and never handles private
+   keys. The browser build uses one direct Web Serial session; it does not invoke
+   Rust and never handles the firmware's private TLS identity.
 4. Native duplex acceptance on the same image, followed by the desktop workflow.
 5. Release qualification: repeated boots, idle discovery, cancellation, refusal,
    reconnect, Unicode names, binary data and zero-byte files.

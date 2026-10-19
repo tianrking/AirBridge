@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { mergeSnapshot, type Snapshot } from "./types";
+import { webBridge } from "./web/bridge";
+import { supportIssue } from "./web/platform";
 const initial: Snapshot = {
   can_resolve: false,
   resolving_peer: null,
@@ -18,8 +20,21 @@ export function useBridge() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const native = isTauri();
+  const unsupported = native ? null : supportIssue();
   useEffect(() => {
-    if (!native) return;
+    if (native || snapshot.connection !== "connected") return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [native, snapshot.connection]);
+  useEffect(() => {
+    if (!native) {
+      setSnapshot(webBridge.getSnapshot());
+      return webBridge.subscribe(() => setSnapshot(webBridge.getSnapshot()));
+    }
     let disposed = false;
     let unlisten: (() => void) | undefined;
     const update = (next: Snapshot) => {
@@ -47,15 +62,15 @@ export function useBridge() {
       command: string,
       args?: Record<string, unknown>,
     ): Promise<T | undefined> => {
-      if (!native) {
-        setError("Open the AirBridge desktop app to connect real hardware.");
-        return;
-      }
       setError(null);
       setPending(true);
       try {
-        return await invoke<T>(command, args);
+        return native
+          ? await invoke<T>(command, args)
+          : await webBridge.call<T>(command, args);
       } catch (reason) {
+        if (reason instanceof DOMException && reason.name === "AbortError")
+          return;
         setError(String(reason));
         return;
       } finally {
@@ -65,7 +80,10 @@ export function useBridge() {
     [native],
   );
   const refresh = useCallback(async () => {
-    if (!native) return;
+    if (!native) {
+      setSnapshot(webBridge.getSnapshot());
+      return;
+    }
     try {
       const next = await invoke<Snapshot>("get_snapshot");
       setSnapshot((current) => mergeSnapshot(current, next));
@@ -78,6 +96,7 @@ export function useBridge() {
     error: error ?? snapshot.error,
     pending,
     native,
+    unsupported,
     call,
     refresh,
     clearError: () => {
@@ -86,6 +105,7 @@ export function useBridge() {
         void invoke("dismiss_error").catch((reason) =>
           setError(String(reason)),
         );
+      else void webBridge.call("dismiss_error");
     },
   };
 }

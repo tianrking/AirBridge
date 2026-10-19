@@ -12,6 +12,19 @@
 
 AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。可攜式 C++17 核心實作 AWDL 封包、同步與協定解析，ESP-IDF 6.1 提供無線後端；Tauri 2 桌面應用程式採用 React、TypeScript 與單一 Rust 序列埠處理器。
 
+## 網頁應用程式
+
+同一套 React／TypeScript 介面現在支援直接 Web Serial 後端，原有 Tauri／Rust
+桌面版仍保留。使用桌面 Chrome／Edge，在 `desktop` 執行 `npm ci`、
+`npm run dev`，開啟 **http://127.0.0.1:1420/**。先選擇接收資料夾，再連接
+已核對的 COM4。需要支援 `hardware_id` 的新韌體。
+
+已實作原生名稱查詢、裝置選擇、雙向檔案與進度，以及檔案關閉後重新讀取的
+SHA256 校驗。瀏覽器介面、真實瀏覽器儲存與虛擬串口測試已通過；真實串口、
+使用者選擇的資料夾與原生 AirDrop 往返仍待驗收，不能沿用 CLI 的成功紀錄。
+
+[網頁操作與儲存設計](desktop/README.web.md) · [網頁驗收狀態](docs/web-qualification.md)
+
 ## 桌面應用程式
 
 包含裝置選擇、原生檔案與資料夾選擇器、雙向進度、取消、接收位置與傳輸詳情。預設英文，設定中可選繁體中文與西班牙文。名稱取自原生 `/Discover`；尚未解析時會明確標示。
@@ -118,7 +131,7 @@ python scripts/send-native.py C:\path\to\file.bin --peer $peer `
 
 ## 驗證
 
-**可攜式協定檢查: 281.** **Windows 主機測試: 20.**
+**可攜式協定檢查: 346.** **Windows 主機測試: 20.**
 
 可攜式測試涵蓋畸形封包、邊界、同步與協定線格式；主機測試檢查偏移、雜湊與可靠落盤的失敗情況。實機證據另行記錄。
 

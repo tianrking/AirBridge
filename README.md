@@ -10,7 +10,7 @@
 
 </div>
 
-AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows over serial. A portable C++17 core implements AWDL framing, synchronization and protocol parsing; ESP-IDF 6.1 provides the radio backend. The Tauri 2 desktop application uses React, TypeScript and a single Rust serial actor.
+AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows over serial. A portable C++17 core implements AWDL framing, synchronization and protocol parsing; ESP-IDF 6.1 provides the radio backend. One React/TypeScript interface supports a direct Web Serial browser backend and the retained Tauri 2/Rust desktop backend.
 
 ## Project status
 
@@ -25,6 +25,7 @@ macOS Finder discovered **AirBridge PC** and delivered a 262,145-byte binary wit
 | Mac → Windows files | Text and 262,145-byte binary verified |
 | Windows → Mac files | 65,537-byte binary and same-image roundtrip verified |
 | Rust transfer backend | Native 4,097-byte binary roundtrip verified without Python |
+| Web Serial application | Implemented; browser storage/UI and virtual-wire tests passed; real serial/native AirDrop acceptance pending |
 | Desktop application | Development build; real connection and native names verified; desktop file qualification in progress |
 
 <details>
@@ -39,6 +40,26 @@ eb3ddcc7caeb6bef3d10eacdfc07ce0a89997ae4741711c528cce1402d65596c
 </details>
 
 > Development status: long-term visibility, repeated reconnects, larger transfers, iPhone interoperability, contact-only authentication and folder transfer remain unqualified. A discovered MAC or a successful TX callback does not prove file delivery.
+
+## Web application
+
+Use desktop Chrome or Edge without installing the Tauri application. The same
+React interface connects directly to the bridge, resolves native Apple names,
+selects recipients and files, shows duplex progress and checks received files
+after closing and reopening them. The static host does not carry file payloads.
+
+```powershell
+cd desktop
+npm ci
+npm run dev
+```
+
+Open **http://127.0.0.1:1420/**, choose a receive folder, then connect the verified
+COM4 in the browser chooser. Browser-capable firmware with `hardware_id` support
+is required. This is a development build; earlier CLI native transfer evidence
+does not qualify the new browser path.
+
+[Web setup and checked-storage design](desktop/README.web.md) · [Measured web status](docs/web-qualification.md)
 
 ## Desktop application
 
@@ -123,7 +144,7 @@ operation is never automatically resent.
 
 ## Verification
 
-**Portable protocol assertions: 281.** **Windows host tests: 20.**
+**Portable protocol assertions: 346.** **Windows host tests: 20.**
 
 The portable suite covers malformed frames, bounds, synchronization and protocol wire data. Host tests exercise offset, digest and durable-publication failures. Hardware evidence is recorded separately.
 
@@ -147,6 +168,7 @@ python -m unittest discover -s tests -p "test_*.py" -q
 flowchart LR
   Apple["Apple device"] <-->|"AWDL · IPv6 · TLS"| ESP["ESP32-S3 / ESP-IDF 6.1"]
   ESP <-->|"Serial"| PC["Windows host"]
+  PC <--> Web["React · TypeScript · Web Serial"]
   PC <--> UI["Tauri 2 · React · TypeScript · Rust"]
 ```
 
@@ -184,6 +206,8 @@ AWDL MAC, DNS service instance, host label and AirDrop display name are differen
 - [ ] Stable discovery, reconnect recovery and clearer failure states
 - [ ] Broader peer selection, real names and transfer progress
 - [x] Tauri 2 desktop development build with React, TypeScript and Rust
+- [x] Shared React browser interface and direct Web Serial transfer backend
+- [ ] Browser real-serial duplex and user-selected-directory acceptance
 - [ ] Packaged desktop native duplex and sustained discovery qualification
 - [ ] Expanded device, file-size and transport qualification
 

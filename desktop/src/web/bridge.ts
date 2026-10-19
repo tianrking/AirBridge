@@ -97,6 +97,8 @@ export class WebBridge {
       "Invalid native name identity",
     );
     this.names.set(peer, name);
+    if (this.names.size > 128)
+      this.names.delete(this.names.keys().next().value!);
     this.snapshot.peers = this.snapshot.peers.map((p) =>
       p.mac === peer ? { ...p, name, name_source: "airdrop_discover" } : p,
     );
@@ -174,6 +176,13 @@ export class WebBridge {
             outgoing.done === outgoing.progress_total ? "finishing" : "sending";
         }
         break;
+      case "outgoing_complete":
+        check(
+          outgoing && e.transfer_id === outgoing.id,
+          "Unexpected native transfer completion",
+        );
+        // The sender waiter verifies success, bytes and digest before publishing.
+        break;
       case "incoming_started":
         this.incomingParts.clear();
         this.start(e, false);
@@ -228,6 +237,14 @@ export class WebBridge {
         t.error = error.message;
       }
     this.publish();
+    const session = this.session;
+    if (session)
+      void session
+        .close()
+        .then(() => {
+          if (this.session === session) this.session = undefined;
+        })
+        .catch(() => {});
   };
   async call<T>(verb: string, args: Record<string, unknown> = {}): Promise<T> {
     switch (verb) {
@@ -351,12 +368,13 @@ export class WebBridge {
       this.directory,
       "Choose a receive folder before connecting (the button is in Receive or Settings)",
     );
-    if (this.session) await this.disconnect();
     const api = (navigator as Navigator & { serial: SerialAPI }).serial;
     // Must remain in the initiating click's user-activation scope.
     const port = await api.requestPort({
       filters: [{ usbVendorId: 0x303a, usbProductId: 0x1001 }],
     });
+    // Choosing is metadata only. Release the prior owner before actually opening.
+    if (this.session) await this.disconnect();
     this.snapshot.connection = "connecting";
     this.snapshot.error = null;
     this.publish();
@@ -392,7 +410,12 @@ export class WebBridge {
     clearInterval(this.expiry);
     const session = this.session;
     this.session = undefined;
-    if (session) await session.close();
+    let closeError: unknown;
+    try {
+      if (session) await session.close();
+    } catch (error) {
+      closeError = error;
+    }
     await this.running;
     this.operation = null;
     this.snapshot.resolving_peer = null;
@@ -404,6 +427,7 @@ export class WebBridge {
         t.error = "Disconnected before native completion";
       }
     this.publish();
+    if (closeError) throw closeError;
   }
   private async resolve(peer: string, port: number) {
     const session = this.session!;
@@ -438,6 +462,10 @@ export class WebBridge {
     let transfer: Transfer | undefined;
     try {
       const data = new Uint8Array(await file.arrayBuffer());
+      check(
+        data.length <= Number(session.capabilities!.max_file),
+        "Source exceeds the connected firmware's staging limit",
+      );
       const hash = await sha256(data);
       check(this.session === session, "Session ended before source staging");
       const metadata = manifest(
@@ -502,6 +530,13 @@ export class WebBridge {
       try {
         await session.request("SEND");
         outcome = await completion.promise;
+      } catch (error) {
+        // Stop an unresolved native operation cooperatively; never resend it.
+        if (this.session === session && !this.cancelRequested) {
+          this.cancelRequested = true;
+          await session.request("CANCEL").catch(() => {});
+        }
+        throw error;
       } finally {
         completion.dispose();
       }

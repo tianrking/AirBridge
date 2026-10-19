@@ -19,11 +19,13 @@ export function PeerCard({
   selected,
   onSelect,
   copy,
+  resolving = false,
 }: {
   peer: Peer;
   selected: boolean;
   onSelect: () => void;
   copy: Copy;
+  resolving?: boolean;
 }) {
   const deviceName = peer.name ?? copy.appleDevice;
   const Icon = peer.name?.toLowerCase().includes("mac") ? Laptop : Smartphone;
@@ -41,7 +43,11 @@ export function PeerCard({
       </span>
       <span className="peer-name">{deviceName}</span>
       <span className="peer-subtitle">
-        {peer.name ? copy.nativeName : copy.resolving}
+        {peer.name
+          ? copy.nativeName
+          : resolving
+            ? copy.connecting
+            : copy.resolving}
       </span>
       <span className="peer-foot">
         <i className="dot green" />
@@ -125,12 +131,14 @@ export function TransferDetails({
   onClose,
   onFolder,
   onCancel,
+  folderLabel,
 }: {
   transfer: Transfer;
   copy: Copy;
   onClose: () => void;
   onFolder: () => void;
   onCancel: () => void;
+  folderLabel?: string;
 }) {
   const dialog = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -214,9 +222,12 @@ export function TransferDetails({
           <p className="detail-error">{transfer.error}</p>
         ) : null}
         {transfer.directory ? (
+          <p className="folder-path">{transfer.directory}</p>
+        ) : null}
+        {transfer.directory && transfer.state === "completed" ? (
           <button className="primary" onClick={onFolder}>
             <FolderOpen size={17} />
-            {copy.openFolder}
+            {folderLabel ?? copy.openFolder}
           </button>
         ) : null}
         {transfer.direction === "send" && !terminal(transfer.state) ? (
