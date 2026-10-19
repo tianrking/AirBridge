@@ -16,6 +16,20 @@
 
 </div>
 
+## v0.0.1 公開預覽版
+
+[下載韌體與 Windows 軟體](https://github.com/tianrking/AirBridge/releases/tag/v0.0.1) ·
+[免硬體互動示範](https://w0x7ce.eu/AirBridge/?demo=1) ·
+[韌體安裝指南（英文）](docs/firmware-release.md)
+
+提供 ESP32-S3 N16R8 韌體 ZIP、Windows x64 安裝程式與可攜式 ZIP、靜態網頁 ZIP。
+公開 HTTPS 網頁不需要帳號或安裝；實際傳檔仍需開發板及桌面 Chrome／Edge 或 Tauri。
+示範會明確標示模擬裝置與傳輸，不存取串口、無線或檔案。Windows 套件未簽章。
+新版允許選擇自己的 USB 裝置、首次啟動產生每板獨立 TLS 身分，並需明確授權接收來源。
+這些公開版變更已納入編譯與自動測試，尚待實體互通重新驗收；下文既有實測僅適用先前開發組態。
+
+
+
 AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。可攜式 C++17 核心實作 AWDL 封包、同步與協定解析，ESP-IDF 6.1 提供無線後端；Tauri 2 桌面應用程式採用 React、TypeScript 與單一 Rust 序列埠處理器。
 
 ## 網頁應用程式

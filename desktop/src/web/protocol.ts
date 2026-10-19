@@ -1,7 +1,6 @@
 // Copyright (c) 2026 tianrking
 export const MAX_SEND = 1024 * 1024;
 export const MAX_RECEIVE = 64 * 1024 * 1024;
-export const BOARD_ID = "f0:9e:9e:1e:61:3c";
 export type Event = Record<string, unknown> & { event: string };
 export function check(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
@@ -238,4 +237,14 @@ export function manifest(
       },
     ],
   });
+}
+
+export function factoryIdentity(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    mac(value) &&
+    !(parseInt(value.slice(0, 2), 16) & 1) &&
+    !/^00(?::00){5}$/.test(value) &&
+    !/^ff(?::ff){5}$/i.test(value)
+  );
 }

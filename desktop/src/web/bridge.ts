@@ -55,7 +55,7 @@ export class WebBridge {
   private selected?: { id: string; file: Blob & { name: string } };
   private names = new Map<string, string>();
   private session?: Session;
-  private operation: "send" | "resolve" | null = null;
+  private operation: "send" | "resolve" | "pair" | null = null;
   private operationAbort?: AbortController;
   private cancelRequested = false;
   private cancelTask?: Promise<Event>;
@@ -430,6 +430,37 @@ export class WebBridge {
       case "disconnect_bridge":
         await this.disconnect();
         return null as T;
+      case "pair_peer":
+      case "unpair_peer": {
+        check(
+          this.session &&
+            this.snapshot.connection === "connected" &&
+            this.session.capabilities?.pairing === true,
+          "Update the bridge firmware to enable peer authorization",
+        );
+        check(
+          !this.operation &&
+            !this.snapshot.transfers.some((t) => !terminal(t.state)),
+          "Wait for the active operation before changing receive permissions",
+        );
+        const peer = verb === "pair_peer" ? this.endpoint(args.peer) : null;
+        this.operation = "pair";
+        try {
+          const reply = await this.session.request(
+            peer ? `PAIR ${peer.mac} ${peer.port}` : "UNPAIR",
+          );
+          check(
+            reply.paired_peer === (peer?.mac ?? "00:00:00:00:00:00"),
+            "Peer authorization reply mismatch",
+          );
+          if (this.snapshot.bridge_info)
+            this.snapshot.bridge_info.paired_peer = peer?.mac ?? null;
+          this.publish();
+        } finally {
+          this.operation = null;
+        }
+        return null as T;
+      }
       case "resolve_peer": {
         const peer = this.endpoint(args.peer);
         check(
@@ -564,6 +595,7 @@ export class WebBridge {
       this.snapshot.radio_mac = String(caps.radio_mac);
       this.snapshot.can_resolve = caps.resolve === true;
       this.snapshot.bridge_info = {
+        pairing: caps.pairing === true,
         protocol: typeof caps.protocol === "number" ? caps.protocol : null,
         max_file: typeof caps.max_file === "number" ? caps.max_file : null,
         chunk_bytes:
@@ -573,7 +605,10 @@ export class WebBridge {
         usb_serial: null,
         port: null,
         paired_peer:
-          typeof caps.paired_peer === "string" ? caps.paired_peer : null,
+          typeof caps.paired_peer === "string" &&
+          caps.paired_peer !== "00:00:00:00:00:00"
+            ? caps.paired_peer
+            : null,
         connected_at: Date.now(),
       };
       clearInterval(this.expiry);

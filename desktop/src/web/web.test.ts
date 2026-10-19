@@ -5,7 +5,6 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import {
   base64,
-  BOARD_ID,
   command,
   Lines,
   manifest,
@@ -207,9 +206,9 @@ describe("single-owner asynchronous serial session", () => {
     );
     expect(port.records.filter((r) => r.includes("HELLO"))).toHaveLength(1);
   });
-  it("closes on a missing or unexpected hardware identity before accepting transfers", async () => {
+  it("closes on a missing or invalid hardware identity before accepting transfers", async () => {
     const port = new VirtualPort();
-    port.hardware = "00:11:22:33:44:55";
+    port.hardware = "00:00:00:00:00:00";
     const session = new Session(
       port,
       await directory(),
@@ -280,9 +279,10 @@ describe("single-owner asynchronous serial session", () => {
 });
 describe("browser workflow state", () => {
   const peer = "ea:fd:00:20:7d:38";
-  async function connected() {
+  async function connected(pairing = true) {
     const dir = await directory(),
       port = new VirtualPort();
+    port.pairing = pairing;
     const file = new File(
       [new Uint8Array(4097).map((_, n) => n % 251)],
       "browser-測試.bin",
@@ -317,7 +317,7 @@ describe("browser workflow state", () => {
       protocol: 2,
       max_file: 1048576,
       chunk_bytes: 112,
-      hardware_id: BOARD_ID,
+      hardware_id: "a0:b7:65:12:34:56",
       usb_serial: null,
       port: null,
     });
@@ -345,6 +345,46 @@ describe("browser workflow state", () => {
     expect(bridge.snapshot.peers[0].name).toBe(null);
     await bridge.call("disconnect_bridge");
     expect(bridge.snapshot.bridge_info?.connected_at).toBeGreaterThan(0);
+  });
+  it("explicitly authorizes and revokes a fresh observed incoming peer", async () => {
+    const { bridge, port } = await connected();
+    expect(bridge.snapshot.bridge_info?.paired_peer).toBeNull();
+    await bridge.call("pair_peer", { peer });
+    expect(bridge.snapshot.bridge_info?.paired_peer).toBe(peer);
+    expect(port.records.some((r) => r.includes(`PAIR ${peer} 8770`))).toBe(
+      true,
+    );
+    await bridge.call("unpair_peer");
+    expect(bridge.snapshot.bridge_info?.paired_peer).toBeNull();
+    await bridge.call("disconnect_bridge");
+  });
+  it("rejects unobserved peers and mismatched authorization replies", async () => {
+    const { bridge, port } = await connected();
+    const before = port.records.length;
+    await expect(
+      bridge.call("pair_peer", { peer: "02:00:00:00:00:12" }),
+    ).rejects.toThrow();
+    expect(port.records).toHaveLength(before);
+    port.reply = (_record, sequence) => ({
+      event: "command_reply",
+      sequence,
+      ok: true,
+      paired_peer: "02:00:00:00:00:12",
+    });
+    await expect(bridge.call("pair_peer", { peer })).rejects.toThrow(
+      /mismatch/,
+    );
+    expect(bridge.snapshot.bridge_info?.paired_peer).toBeNull();
+    await bridge.call("disconnect_bridge");
+  });
+  it("old firmware cannot silently bypass the incoming authorization capability", async () => {
+    const { bridge, port } = await connected(false);
+    const before = port.records.length;
+    await expect(bridge.call("pair_peer", { peer })).rejects.toThrow(
+      /firmware/,
+    );
+    expect(port.records).toHaveLength(before);
+    await bridge.call("disconnect_bridge");
   });
   it("retains native names in history and scanner reports do not rewrite transfer timestamps", async () => {
     const { bridge, port } = await connected();

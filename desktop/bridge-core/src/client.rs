@@ -1,6 +1,6 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 use crate::{
-    protocol::{self, Lines, MAX_FILE, PORT, USB_SERIAL},
+    protocol::{self, Lines, MAX_FILE},
     receiving::Receiver,
 };
 use anyhow::{bail, ensure, Context, Result};
@@ -36,19 +36,15 @@ pub struct Client {
     cancel: Arc<AtomicBool>,
 }
 impl Client {
-    pub fn open(
+    pub fn open_selected(
+        selection: crate::ports::BridgePort,
         directory: PathBuf,
         events: Events,
         stop: Arc<AtomicBool>,
         cancel: Arc<AtomicBool>,
     ) -> Result<Self> {
-        let ports = serialport::available_ports()?;
-        let matched=ports.iter().filter(|port|port.port_name==PORT && matches!(&port.port_type,serialport::SerialPortType::UsbPort(info) if info.serial_number.as_deref()==Some(USB_SERIAL))).count();
-        ensure!(
-            matched == 1,
-            "Authorized replacement COM4 USB identity is absent"
-        );
-        let mut port = serialport::new(PORT, 115200)
+        crate::ports::validate_selection(&selection, &crate::ports::available()?)?;
+        let mut port = serialport::new(&selection.port, 115200)
             .timeout(Duration::from_millis(50))
             .flow_control(serialport::FlowControl::None)
             .dtr_on_open(false)
@@ -89,9 +85,16 @@ impl Client {
                 && protocol::mac(hello["radio_mac"].as_str().unwrap_or("")),
             "Unsupported bridge capabilities"
         );
+        ensure!(
+            hello["hardware_id"]
+                .as_str()
+                .is_some_and(|id| crate::ports::factory_identity(id)
+                    && id.eq_ignore_ascii_case(&selection.usb_serial)),
+            "Firmware factory identity does not match the selected USB device"
+        );
         client.capabilities = Some(hello.clone());
         (client.events)(
-            json!({"event":"connected","port":PORT,"usb_serial":USB_SERIAL,"capabilities":hello}),
+            json!({"event":"connected","port":selection.port,"usb_serial":selection.usb_serial,"capabilities":hello}),
         );
         // Connecting USB must not start a network operation or delay queued
         // user commands. Resolve a currently advertised peer on selection.
@@ -117,6 +120,31 @@ impl Client {
             }
         }
         bail!("Serial command timed out; outcome uncertain; no automatic resend")
+    }
+    pub fn pair(&mut self, peer: Option<&str>, port: u16) -> Result<()> {
+        ensure!(
+            self.capabilities
+                .as_ref()
+                .is_some_and(|caps| caps["pairing"] == true),
+            "Update bridge firmware to enable session peer authorization"
+        );
+        let body = match peer {
+            Some(id) => {
+                ensure!(protocol::mac(id) && port > 0, "Invalid peer");
+                format!("PAIR {id} {port}")
+            }
+            None => "UNPAIR".to_owned(),
+        };
+        let reply = self.request(&body)?;
+        let expected = peer.unwrap_or("00:00:00:00:00:00");
+        ensure!(
+            reply["paired_peer"]
+                .as_str()
+                .is_some_and(|id| id.eq_ignore_ascii_case(expected)),
+            "Peer authorization reply mismatch"
+        );
+        (self.events)(json!({"event":"pairing_updated","paired_peer":reply["paired_peer"]}));
+        Ok(())
     }
     pub fn request(&mut self, body: &str) -> Result<Value> {
         self.request_body(format!("{} {body}", self.session), Duration::from_secs(5))

@@ -1,3 +1,5 @@
+import { isTauri } from "@tauri-apps/api/core";
+import { useDemoBridge } from "./demo";
 import { useState } from "react";
 import {
   Activity,
@@ -41,15 +43,29 @@ import {
   connectionLabel,
   ownsConnection,
 } from "./presentation";
+import { APP_VERSION } from "./version";
 import brand from "./brand.svg";
 import { motionStyle } from "./motion";
 export default function App() {
+  return !isTauri() &&
+    new URLSearchParams(window.location.search).get("demo") === "1" ? (
+    <DemoApp />
+  ) : (
+    <LiveApp />
+  );
+}
+function LiveApp() {
   return <BridgeApp bridge={useBridge()} />;
+}
+function DemoApp() {
+  return <BridgeApp bridge={useDemoBridge()} demo />;
 }
 export function BridgeApp({
   bridge,
+  demo = false,
 }: {
   bridge: ReturnType<typeof useBridge>;
+  demo?: boolean;
 }) {
   const { snapshot } = bridge;
   const { language, setLanguage, theme, setTheme, resolvedTheme } =
@@ -58,10 +74,27 @@ export function BridgeApp({
   const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [bridgePorts, setBridgePorts] = useState<
+    { port: string; usb_serial: string }[]
+  >([]);
+  const [portChoice, setPortChoice] = useState("");
   const [inspector, setInspector] = useState<
-    "bridge" | "disconnect" | Peer | null
+    "bridge" | "disconnect" | "port" | Peer | null
   >(null);
-  const copy = translations[language];
+  const baseCopy = translations[language];
+  const copy = demo
+    ? {
+        ...baseCopy,
+        nativeConfirmed: baseCopy.demoComplete,
+        hashChecked: baseCopy.demoComplete,
+        nativeName: baseCopy.demoLabel,
+        advertised: baseCopy.demoLabel,
+        advertisementOnly: baseCopy.demoDisclosure,
+        identitySource: baseCopy.demoDisclosure,
+        sent: `${baseCopy.sent} · ${baseCopy.demoLabel}`,
+        received: `${baseCopy.received} · ${baseCopy.demoLabel}`,
+      }
+    : baseCopy;
   const webCopy = webTranslations[language];
   const connected = snapshot.connection === "connected";
   const busyConnection = connectionBusy(snapshot.connection);
@@ -83,12 +116,34 @@ export function BridgeApp({
           advertised: false,
         })
       : undefined;
+  const authorizedPeer =
+    snapshot.bridge_info?.paired_peer &&
+    snapshot.bridge_info.paired_peer !== "00:00:00:00:00:00"
+      ? snapshot.bridge_info.paired_peer
+      : null;
   const activeTransfer = snapshot.transfers.some(
     (transfer) => !terminal(transfer.state),
   );
-  function connectAction() {
+  async function connectAction() {
     if (connected && activeTransfer) {
       setInspector("disconnect");
+      return;
+    }
+    if (
+      bridge.native &&
+      !connected &&
+      !busyConnection &&
+      snapshot.connection !== "cleanup_failed"
+    ) {
+      const ports =
+        await bridge.call<{ port: string; usb_serial: string }[]>(
+          "list_bridges",
+        );
+      if (ports) {
+        setBridgePorts(ports);
+        setPortChoice(ports[0]?.port ?? "");
+        setInspector("port");
+      }
       return;
     }
     void bridge.call(
@@ -158,12 +213,13 @@ export function BridgeApp({
             </div>
           </div>
           <p>{copy.subtitle}</p>
-          <span className="version">AirBridge 0.4.0</span>
+          <span className="version">AirBridge {APP_VERSION}</span>
         </div>
       </aside>
       <main className="main">
         <header className="topbar">
           <span>{copy[page]}</span>
+          {demo && <span className="demo-pill">{copy.demoLabel}</span>}
           <div className="topbar-status">
             <i className={`dot ${connected ? "green" : "gray"}`} />
             {connected
@@ -172,6 +228,17 @@ export function BridgeApp({
           </div>
         </header>
         <div className={`page-content ${page === "share" ? "share-page" : ""}`}>
+          {demo && (
+            <section className="demo-banner" aria-label={copy.demoLabel}>
+              <div>
+                <strong>{copy.demoLabel}</strong>
+                <p>{copy.demoDisclosure}</p>
+              </div>
+              <a className="secondary compact" href="./">
+                {copy.exitDemo}
+              </a>
+            </section>
+          )}
           <div className="page-heading">
             <div>
               <p className="eyebrow">AirBridge</p>
@@ -208,7 +275,7 @@ export function BridgeApp({
               </button>
             </div>
           ) : null}
-          {!bridge.native && (!connected || page === "settings") && (
+          {!demo && !bridge.native && (!connected || page === "settings") && (
             <BrowserAccess language={language} />
           )}
           {page === "share" ? (
@@ -230,6 +297,11 @@ export function BridgeApp({
                         : copy.connectionHelp}
                   </p>
                 </div>
+                {!connected && !demo && (
+                  <a className="text-button demo-link" href="?demo=1">
+                    {copy.tryDemo}
+                  </a>
+                )}
                 <button
                   className="icon-button bridge-info"
                   aria-label={copy.connectionDetails}
@@ -367,9 +439,54 @@ export function BridgeApp({
                     <ArrowDownToLine size={27} strokeWidth={1.3} />
                   </span>
                   <h2>
-                    {connected ? copy.receiverLinked : copy.receiverOffline}
+                    {connected
+                      ? authorizedPeer
+                        ? copy.receiverLinked
+                        : copy.authorizeToReceive
+                      : copy.receiverOffline}
                   </h2>
-                  <p>{connected ? copy.receiverHelp : copy.connectionHelp}</p>
+                  <p>
+                    {connected
+                      ? authorizedPeer
+                        ? copy.receiverHelp
+                        : copy.authorizeHelp
+                      : copy.connectionHelp}
+                  </p>
+                  {connected && snapshot.bridge_info?.pairing && (
+                    <div className="receive-permissions">
+                      <button
+                        className="secondary compact"
+                        disabled={!target || bridge.pending || activeTransfer}
+                        onClick={() =>
+                          target &&
+                          void bridge.call("pair_peer", {
+                            peer: target.mac,
+                            port: target.port,
+                          })
+                        }
+                      >
+                        {copy.authorizePeer}
+                      </button>
+                      {authorizedPeer && (
+                        <button
+                          className="text-button"
+                          disabled={bridge.pending || activeTransfer}
+                          onClick={() => void bridge.call("unpair_peer")}
+                        >
+                          {copy.revokePeer}
+                        </button>
+                      )}
+                      {authorizedPeer && (
+                        <p>
+                          {copy.authorizedPeer}:{" "}
+                          <bdi dir="auto">
+                            {peers.find((p) => p.mac === authorizedPeer)
+                              ?.name ?? authorizedPeer}
+                          </bdi>
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div className="receive-identity">
                     <Laptop size={18} />
                     <strong>AirBridge PC</strong>
@@ -566,7 +683,7 @@ export function BridgeApp({
                 <dl>
                   <div>
                     <dt>{copy.version}</dt>
-                    <dd>0.4.0</dd>
+                    <dd>{APP_VERSION}</dd>
                   </div>
                   <div>
                     <dt>{copy.hardware}</dt>
@@ -595,10 +712,65 @@ export function BridgeApp({
             AirBridge
             <span className="footer-divider" />
             {copy.help}
+            <a
+              className="release-link"
+              href={
+                "https://github.com/tianrking/AirBridge/releases/tag/v" +
+                APP_VERSION
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {copy.downloads}
+            </a>
           </footer>
         </div>
       </main>
-      {inspector === "bridge" ? (
+      {inspector === "port" ? (
+        <Dialog
+          title={copy.selectBridge}
+          copy={copy}
+          onClose={() => setInspector(null)}
+          icon={<Cable size={29} />}
+        >
+          <p className="dialog-description">
+            {bridgePorts.length ? copy.bridgePortHelp : copy.noBridges}
+          </p>
+          {bridgePorts.length > 0 && (
+            <select
+              className="port-select"
+              aria-label={copy.serialPort}
+              value={portChoice}
+              onChange={(e) => setPortChoice(e.target.value)}
+            >
+              {bridgePorts.map((p) => (
+                <option value={p.port} key={p.port}>
+                  {p.port} · {p.usb_serial}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="dialog-actions">
+            <button
+              className="primary"
+              disabled={!portChoice || bridge.pending}
+              onClick={async () => {
+                const selection = bridgePorts.find(
+                  (p) => p.port === portChoice,
+                );
+                if (selection) {
+                  const result = await bridge.call("connect_bridge", {
+                    selection,
+                  });
+                  if (result !== undefined) setInspector(null);
+                }
+              }}
+            >
+              {copy.connect}
+            </button>
+          </div>
+        </Dialog>
+      ) : inspector === "bridge" ? (
         <BridgeDetails
           snapshot={snapshot}
           language={language}

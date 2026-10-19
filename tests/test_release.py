@@ -2,6 +2,7 @@
 import importlib.util
 import itertools
 import json
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ import zipfile
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'scripts'))
 spec = importlib.util.spec_from_file_location('package_web', ROOT / 'scripts/package-web.py')
 packager = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(packager)
@@ -57,20 +59,25 @@ class ReleasePolicy(unittest.TestCase):
     def test_gate_rejects_failed_cancelled_skipped_and_missing_results(self):
         quality = self.workflow('quality.yml')
         gate = quality['jobs']['quality-gate']
-        self.assertEqual(gate['needs'], ['web', 'native'])
+        suites = ['web', 'native', 'firmware', 'desktop']
+        self.assertEqual(gate['needs'], suites)
         self.assertEqual(gate['if'], 'always()')
         script = gate['steps'][0]['run']
-        self.assertEqual(script.strip().splitlines(), [
-            'test "$WEB_RESULT" = success', 'test "$NATIVE_RESULT" = success'])
-        for web, native in itertools.product(['success', 'failure', 'cancelled', 'skipped', ''], repeat=2):
+        self.assertEqual(script.strip().splitlines(), [f'test "${name.upper()}_RESULT" = success' for name in suites])
+        outcomes = [['success'] * 4]
+        for index, bad in itertools.product(range(4), ['failure', 'cancelled', 'skipped', '']):
+            values = ['success'] * 4
+            values[index] = bad
+            outcomes.append(values)
+        for values in outcomes:
             # Run the actual gate commands, using sh on Unix and Git's bash on Windows.
             import os
             import shutil
             import subprocess
             shell = shutil.which('bash') if os.name != 'nt' else r'C:\Program Files\Git\bin\bash.exe'
-            env = dict(os.environ, WEB_RESULT=web, NATIVE_RESULT=native)
+            env = dict(os.environ, **{name.upper() + '_RESULT': value for name, value in zip(suites, values)})
             code = subprocess.run([shell, '-e', '-c', script], env=env, capture_output=True).returncode
-            self.assertEqual(code == 0, web == native == 'success', (web, native))
+            self.assertEqual(code == 0, all(v == 'success' for v in values), values)
 
     def test_all_test_steps_are_blocking_and_actions_pinned(self):
         quality = self.workflow('quality.yml')
@@ -87,6 +94,25 @@ class ReleasePolicy(unittest.TestCase):
                     self.assertNotIn('continue-on-error', step)
                     if 'uses' in step:
                         self.assertRegex(step['uses'], r'@[0-9a-f]{40}$')
+
+    def test_firmware_and_installer_are_required_real_builds(self):
+        quality = self.workflow('quality.yml')['jobs']
+        self.assertRegex(quality['firmware']['container']['image'], r'^espressif/idf:v6\.1@sha256:[0-9a-f]{64}$')
+        firmware = '\n'.join(s.get('run', '') for s in quality['firmware']['steps'])
+        self.assertIn('idf.py -C firmware', firmware)
+        self.assertIn('-DAIRBRIDGE_PUBLIC_BUILD=ON', firmware)
+        self.assertIn('package-firmware.py', firmware)
+        self.assertEqual(quality['desktop']['needs'], 'web')
+        self.assertTrue(any(s.get('with', {}).get('name') == 'tested-web' for s in quality['desktop']['steps']))
+        desktop = '\n'.join(s.get('run', '') for s in quality['desktop']['steps'])
+        self.assertIn('tauri -- build --ci --bundles nsis', desktop)
+        self.assertIn('package-desktop.py', desktop)
+        release = self.workflow('release.yml')['jobs']
+        names = {s.get('with', {}).get('name') for s in release['package']['steps']}
+        self.assertTrue({'public-esp32s3','public-windows-x64','tested-web'}.issubset(names))
+        publish = '\n'.join(s.get('run','') for s in release['publish']['steps'])
+        self.assertIn('sha256sum --check', publish)
+        self.assertIn('--prerelease', publish)
 
 
 class WebPackage(unittest.TestCase):

@@ -46,7 +46,7 @@ def package(root, tag, commit, output):
         'CI uses synthetic serial input and real browser OPFS; it does not certify physical USB, '
         'the user-selected Windows folder picker, radio discovery or native AirDrop interoperability.\n\n'
         'Serve the extracted build over HTTPS or localhost. See the included README. '
-        'Tauri and ESP32 firmware are retained in source and are not binaries in this web release.\n', encoding='utf-8')
+        'This ZIP contains the web assets only. The same release provides separate Windows and ESP32-S3 packages.\n', encoding='utf-8')
     return archive
 
 

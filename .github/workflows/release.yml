@@ -1,4 +1,4 @@
-name: Release verified web
+name: Release verified firmware, desktop and web
 
 on:
   push:
@@ -27,13 +27,24 @@ jobs:
         with:
           name: tested-web
           path: desktop/dist
-      - name: Package exact tested artifact and verify manifest
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: public-esp32s3
+          path: work/components/firmware
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: public-windows-x64
+          path: work/components/desktop
+      - name: Verify version, every component and archive readback
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: python3 scripts/package-web.py --tag "$RELEASE_TAG" --commit "$GITHUB_SHA" --output work/release
+        run: |
+          python3 scripts/check-version.py --tag "$RELEASE_TAG"
+          python3 scripts/package-web.py --tag "$RELEASE_TAG" --commit "$GITHUB_SHA" --output work/components/web
+          python3 scripts/assemble-release.py --tag "$RELEASE_TAG" --commit "$GITHUB_SHA" --input work/components --output work/release
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: verified-web-release
+          name: verified-release
           path: work/release/*
           if-no-files-found: error
 
@@ -46,7 +57,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: verified-web-release
+          name: verified-release
           path: release
       - name: Publish only after all gates passed
         env:
@@ -56,4 +67,4 @@ jobs:
         run: |
           cd release
           sha256sum --check SHA256SUMS
-          gh release create "$RELEASE_TAG" --verify-tag --title "AirBridge $RELEASE_TAG" --notes-file RELEASE-NOTES.md AirBridge-web-*.zip SHA256SUMS
+          gh release create "$RELEASE_TAG" --verify-tag --prerelease --title "AirBridge $RELEASE_TAG" --notes-file RELEASE-NOTES.md AirBridge-*.zip AirBridge-*-setup.exe SHA256SUMS RELEASE-MANIFEST.json

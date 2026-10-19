@@ -1,4 +1,4 @@
-import { BOARD_ID, unbase64, type Event } from "../src/web/protocol";
+import { unbase64, type Event } from "../src/web/protocol";
 import type { SerialPort } from "../src/web/platform";
 
 export function deferred<T = void>() {
@@ -20,8 +20,9 @@ export class VirtualPort implements SerialPort {
   openCalls = 0;
   closeCalls = 0;
   closeFailures = 0;
-  hardware = BOARD_ID;
+  hardware = "a0:b7:65:12:34:56";
   respond = true;
+  pairing = true;
   signals?: { dataTerminalReady: boolean; requestToSend: boolean };
   openGate?: Promise<void>;
   closeGate?: Promise<void>;
@@ -61,6 +62,8 @@ export class VirtualPort implements SerialPort {
               radio_mac: "02:11:22:33:44:55",
               hardware_id: this.hardware,
               resolve: true,
+              pairing: this.pairing,
+              paired_peer: words[3] === "PAIR" ? words[4] : "00:00:00:00:00:00",
             },
           );
         this.onCommand?.(record, sequence);

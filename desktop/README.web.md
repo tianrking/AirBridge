@@ -29,6 +29,14 @@ Files travel over the local serial and radio links. A static web server only
 serves the application assets; it does not receive file payloads. There are no
 analytics, accounts, CDN runtime dependencies or cloud transfer endpoints.
 
+## Public app and demo
+
+The [hosted app](https://w0x7ce.eu/AirBridge/) works without an account or desktop
+installation. [Explore the demo](https://w0x7ce.eu/AirBridge/?demo=1) without a
+board: sample names and transfers are clearly simulated, with no serial, radio,
+file-picker or disk access. Leaving the demo starts the real app disconnected.
+The demo does not prove hardware compatibility or file delivery.
+
 ## Start locally
 
 Install Node.js 22 or newer. From the repository:
@@ -56,10 +64,19 @@ picker receive an explicit unsupported message. The interface remains navigable.
 
 ## Connect and use
 
+For incoming files, select a freshly observed Apple device and click **Allow
+selected device** before using its native AirDrop panel to send to **AirBridge PC**.
+Revoke authorization after use. One incoming peer is permitted per public serial
+session; a reconnect clears it. This is an address allowlist, not Apple-account
+or Contacts Only authentication. The new public firmware profile and browser-native
+AirDrop path still require physical qualification; see [release notes](../docs/release-notes-v0.0.1.md).
+
+
 1. Close Tauri, serial monitors, Python receivers and flash tools that own the port.
-2. Verify the intended replacement board using Windows or
-   `python -m serial.tools.list_ports -v`: **COM4**, USB serial
-   **F0:9E:9E:1E:61:3C**. Do not select or probe the original COM3.
+2. Connect your ESP32-S3 N16R8 through native USB Serial/JTAG. Download and
+   verify the [public firmware](../docs/firmware-release.md). Public builds accept
+   your explicitly selected compatible board; there is no fixed COM-number or
+   developer serial-number requirement.
 3. Use browser-capable firmware with the additive `hardware_id` reply field.
    Older firmware is rejected safely; it is not silently trusted. See
    [serial protocol](../docs/serial-protocol.md). The firmware remains ESP-IDF 6.1.

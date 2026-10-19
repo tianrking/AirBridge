@@ -45,6 +45,8 @@ have an uncertain result. Reconcile status or start a fresh idle session first.
 | Verb | Arguments | Result |
 | --- | --- | --- |
 | `HELLO` | session nonce | Negotiate a session while idle |
+| `PAIR` | peer AWDL MAC, advertised port | Authorize a fresh observed incoming peer while idle |
+| `UNPAIR` | none | Revoke incoming authorization while idle |
 | `RESOLVE` | peer AWDL MAC, advertised port | Read-only native TLS `/Discover`; no file offer |
 | `BEGIN` | file bytes, manifest bytes, SHA256, peer AWDL MAC, port | Allocate bounded PSRAM staging |
 | `META` | exact offset, Base64 bytes | Stage a binary-plist Ask manifest |
@@ -57,8 +59,12 @@ Chunks contain at most 112 decoded bytes. File staging is at most 1 MiB and
 manifest staging at most 128 KiB. The sender accepts one regular file. The configured
 Apple peer remains the qualified recipient; the new development resolver and sender
 can also target a recently observed AirDrop offer with its matching advertised port.
-Those additional devices are not file-qualified. Incoming access remains restricted
-to the configured peer. Larger sources are rejected before
+Those additional devices are not file-qualified. Public firmware begins with no
+allowed incoming peer. `PAIR` validates a fresh observed AirDrop endpoint before
+allowing that source into the receive service; `UNPAIR` revokes it. Changes are
+rejected during an active receive/send, and replacement public HELLO sessions
+clear the incoming allowlist. Existing private qualification builds retain their
+explicit configured peer. Larger sources are rejected before
 native file requests. Streaming beyond these limits is future qualification.
 
 A `command_reply` includes `sequence`, `ok`, `reason`, `offset`, `protocol`,
@@ -68,11 +74,15 @@ issuing `RESOLVE`. Connecting USB does not initiate a manual network query.
 Browser-capable builds also return `hardware_id`, the factory eFuse base MAC,
 independent of the randomized `radio_mac`. This additive field leaves existing
 native clients compatible. Web Serial exposes USB VID/PID rather than the USB
-serial string: the user must select the already-verified replacement COM4 in the
-browser chooser; after HELLO the web backend requires factory identity
-`f0:9e:9e:1e:61:3c` before accepting transfer events or issuing transfer commands.
-Missing or different identities close the browser session. This identity binding
-prevents accidental board confusion; it is not cryptographic device authentication.
+serial string: the user explicitly selects their own native USB bridge, then
+HELLO must report a syntactically valid, nonzero unicast factory MAC. Tauri also
+checks this value against the explicitly selected port's USB serial descriptor,
+revalidating that selection before opening. The public GUI has no fixed COM or
+factory-ID binding. Missing/invalid identities close the session; this is not
+cryptographic device authentication. The guarded development CLI is separate.
+Public firmware advertises `pairing:true`; `paired_peer` is zero when unapproved.
+The host sends `PAIR` only after a user action and validates its acknowledgement.
+
 Wrong offsets, bad digests, mismatched
 manifest sizes and incomplete staging never initiate native file delivery.
 

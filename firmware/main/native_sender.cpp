@@ -20,7 +20,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "identity_credentials.hpp"
+#include "device_identity.hpp"
 #include "ipv6_link.hpp"
 #include "lwip/sockets.h"
 #include "mbedtls/base64.h"
@@ -28,6 +28,7 @@
 #include "mbedtls/ssl.h"
 #include "mbedtls/x509_crt.h"
 #include "native_service.hpp"
+#include "native_receiver.hpp"
 #include "psa/crypto.h"
 #include "serial_channel.hpp"
 #include "serial_protocol.hpp"
@@ -54,7 +55,7 @@ struct Upload {
     bool resolve_only{};
 } upload;
 bool eligible_peer(const awdl::Mac& peer, std::uint16_t port) {
-    if (peer == permitted_peer) return true;
+    if (peer != awdl::Mac{} && peer == permitted_peer) return true;
     bool found = false;
     const auto now = std::uint64_t(esp_timer_get_time());
     portENTER_CRITICAL(&peer_lock);
@@ -130,17 +131,8 @@ struct Client {
         if (psa_crypto_init() != PSA_SUCCESS)
             return -EIO;
         stage("tls_certificate");
-        int rc = mbedtls_x509_crt_parse(
-            &certificate, reinterpret_cast<const unsigned char*>(identity_assets::certificate),
-            sizeof(identity_assets::certificate));
-        if (rc)
-            return rc;
-        stage("tls_private_key");
-        rc = mbedtls_pk_parse_key(
-            &key, reinterpret_cast<const unsigned char*>(identity_assets::private_key),
-            sizeof(identity_assets::private_key), nullptr, 0);
-        if (rc)
-            return rc;
+        int rc = device_identity_load(certificate, key);
+        if (rc) return rc;
         stage("tls_configuration");
         rc = mbedtls_ssl_config_defaults(&config, MBEDTLS_SSL_IS_CLIENT,
                                          MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
@@ -459,7 +451,7 @@ void reply(const serial::Command& command, bool okay, const char* reason, std::s
                       "{\"event\":\"command_reply\",\"sequence\":%lu,\"ok\":%s,\"reason\":\"%s\","
                       "\"offset\":%u,\"protocol\":2,\"max_file\":%u,\"chunk_bytes\":112,\"radio_"
                       "mac\":\"%02x:%02x:%02x:%02x:%02x:%02x\",\"resolve\":true,"
-                      "\"paired_peer\":\"%02x:%02x:%02x:%02x:%02x:%02x\","
+                      "\"pairing\":true,\"paired_peer\":\"%02x:%02x:%02x:%02x:%02x:%02x\","
                       "\"hardware_id\":\"%02x:%02x:%02x:%02x:%02x:%02x\"}\n",
                       static_cast<unsigned long>(command.sequence), okay ? "true" : "false", reason,
                       unsigned(offset), unsigned(maximum_file), identity[0], identity[1],
@@ -489,6 +481,7 @@ void native_sender_observe(const awdl::Announcement& peer, std::uint64_t receive
         if (item.received < selected->received) selected = &item;
     }
     *selected = {peer.source, peer.service.port, received_us};
+    if (preferred_peer == awdl::Mac{}) preferred_peer = peer.source;
     portEXIT_CRITICAL(&peer_lock);
 }
 bool native_sender_sync_peer(awdl::Mac& peer) {
@@ -516,6 +509,10 @@ bool native_sender_command(awdl::Bytes line) {
             return true;
         }
         if (token != session) {
+#ifdef AIRBRIDGE_PUBLIC_BUILD
+            if (!native_receiver_set_peer({})) { reply(command, false, "receiving", 0, false); return true; }
+            permitted_peer = {};
+#endif
             clear_upload();
             session = token;
             replay.reset();
@@ -558,6 +555,25 @@ bool native_sender_command(awdl::Bytes line) {
     if (busy) {
         reply(command, false, "busy");
         return true;
+    }
+    if (!std::strcmp(body, "UNPAIR")) {
+        if (!native_receiver_set_peer({})) { reply(command, false, "receiving"); return true; }
+        permitted_peer = {}; reply(command, true, "unpaired"); return true;
+    }
+    if (!std::strncmp(body, "PAIR ", 5)) {
+        unsigned octets[6]{}, port = 0; char trailing = 0;
+        if (std::sscanf(body + 5, "%2x:%2x:%2x:%2x:%2x:%2x %u %c", &octets[0], &octets[1],
+                        &octets[2], &octets[3], &octets[4], &octets[5], &port, &trailing) != 7 || !port || port > 65535 || upload.file) {
+            reply(command, false, "invalid_recipient"); return true;
+        }
+        awdl::Mac peer{}; for (unsigned i=0; i<6; ++i) peer[i]=std::uint8_t(octets[i]);
+        if ((peer[0]&1) || peer == awdl::Mac{} || peer == identity || !eligible_peer(peer, std::uint16_t(port))) {
+            reply(command, false, "recipient_not_advertised"); return true;
+        }
+        if (!native_receiver_set_peer(peer)) { reply(command, false, "receiving"); return true; }
+        permitted_peer = peer;
+        portENTER_CRITICAL(&peer_lock); preferred_peer = peer; portEXIT_CRITICAL(&peer_lock);
+        reply(command, true, "paired"); return true;
     }
     if (!std::strncmp(body, "RESOLVE ", 8)) {
         unsigned octets[6]{}, port = 0;

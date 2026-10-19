@@ -17,7 +17,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "identity_credentials.hpp"
+#include "device_identity.hpp"
 #include "ipv6_link.hpp"
 #include "lwip/inet.h"
 #include "lwip/sockets.h"
@@ -34,7 +34,7 @@
 using namespace airbridge;
 namespace {
 awdl::Mac identity{}, allowed{};
-std::atomic<bool> listening{}, host_committed{};
+std::atomic<bool> listening{}, host_committed{}, receiving{};
 portMUX_TYPE commit_lock = portMUX_INITIALIZER_UNLOCKED;
 std::array<char, 33> commit_nonce{};
 std::array<char, 65> chunk_id{};
@@ -486,16 +486,8 @@ void server(void*) {
     auto run = [&]() -> int {
         if (psa_crypto_init() != PSA_SUCCESS)
             return -1;
-        int rc = mbedtls_x509_crt_parse(
-            &cert, reinterpret_cast<const unsigned char*>(identity_assets::certificate),
-            sizeof(identity_assets::certificate));
-        if (rc)
-            return rc;
-        rc = mbedtls_pk_parse_key(
-            &key, reinterpret_cast<const unsigned char*>(identity_assets::private_key),
-            sizeof(identity_assets::private_key), nullptr, 0);
-        if (rc)
-            return rc;
+        int rc = device_identity_load(cert, key);
+        if (rc) return rc;
         rc = mbedtls_ssl_config_defaults(&config, MBEDTLS_SSL_IS_SERVER,
                                          MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
         if (rc)
@@ -536,8 +528,11 @@ void server(void*) {
                 vTaskDelay(pdMS_TO_TICKS(20));
                 continue;
             }
+            bool idle = false;
+            if (!receiving.compare_exchange_strong(idle, true)) { close(connection); continue; }
             const auto permitted = awdl::link_local(allowed);
-            if (std::memcmp(&peer.sin6_addr, permitted.data(), 16)) {
+            if (allowed == awdl::Mac{} || std::memcmp(&peer.sin6_addr, permitted.data(), 16)) {
+                receiving = false;
                 close(connection);
                 event("receiver_peer_rejected");
                 continue;
@@ -566,6 +561,7 @@ void server(void*) {
             mbedtls_ssl_close_notify(&tls);
             mbedtls_ssl_free(&tls);
             close(connection);
+            receiving = false;
         }
     };
     error = run();
@@ -641,6 +637,7 @@ void mdns(void*) {
 }
 }  // namespace
 esp_err_t native_receiver_begin(const awdl::Mac& own, const awdl::Mac& allowed_peer) {
+    if (device_identity_begin() != ESP_OK) return ESP_FAIL;
     identity = own;
     allowed = allowed_peer;
     native_sender_begin(own, allowed_peer);
@@ -651,4 +648,12 @@ esp_err_t native_receiver_begin(const awdl::Mac& own, const awdl::Mac& allowed_p
         xTaskCreatePinnedToCore(mdns, "airdrop_mdns", 6144, nullptr, 1, nullptr, 1) != pdPASS)
         return ESP_ERR_NO_MEM;
     return ESP_OK;
+}
+
+bool native_receiver_set_peer(const awdl::Mac& peer) {
+    bool idle = false;
+    if (!receiving.compare_exchange_strong(idle, true)) return false;
+    allowed = peer;
+    receiving = false;
+    return true;
 }

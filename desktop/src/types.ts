@@ -44,6 +44,7 @@ export interface Transfer {
   files?: TransferFile[];
 }
 export interface BridgeInfo {
+  pairing?: boolean;
   protocol: number | null;
   max_file: number | null;
   chunk_bytes: number | null;

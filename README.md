@@ -18,6 +18,24 @@ CI runs on every push and pull request; [version-tag releases require the same c
 
 AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows over serial. A portable C++17 core implements AWDL framing, synchronization and protocol parsing; ESP-IDF 6.1 provides the radio backend. One React/TypeScript interface supports a direct Web Serial browser backend and the retained Tauri 2/Rust desktop backend.
 
+## Get v0.0.1
+
+**[Downloads](https://github.com/tianrking/AirBridge/releases/tag/v0.0.1)** ·
+**[Interactive demo — no hardware](https://w0x7ce.eu/AirBridge/?demo=1)** ·
+[Release notes](docs/release-notes-v0.0.1.md)
+
+Choose the ESP32-S3 N16R8 firmware ZIP, Windows x64 installer/portable ZIP, or
+self-hostable web ZIP. The public HTTPS app needs no account or installation;
+real transfers need the board and desktop Chrome/Edge or Tauri. The demo clearly
+labels all sample devices/transfers and never requests hardware or file access.
+Windows builds are unsigned. All components are versioned together and require
+the complete CI gate. See [firmware setup and peer authorization](docs/firmware-release.md).
+
+This prerelease removes developer COM/factory-ID bindings, generates a unique TLS
+identity on each board, and requires explicit incoming peer authorization. These
+**new public-profile changes have not yet been physically requalified**. Previous
+Mac native-transfer evidence below applies to the development configuration.
+
 ## Project status
 
 macOS Finder discovered **AirBridge PC** and delivered a 262,145-byte binary with matching source and destination SHA256. Both 6 Mbps and the directed-presence/1 Mbps comparison passed scoped native receive tests. The independent sender also delivered a 65,537-byte binary to the Mac and received it back on the same firmware, with all three actual file SHA256 values matching.
@@ -61,7 +79,7 @@ npm run dev
 ```
 
 Open **http://127.0.0.1:1420/**, choose a receive folder, then connect the verified
-COM4 in the browser chooser. Browser-capable firmware with `hardware_id` support
+bridge in the browser chooser. Public firmware with `hardware_id` support
 is required. This is a development build; earlier CLI native transfer evidence
 does not qualify the new browser path.
 

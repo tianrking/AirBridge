@@ -6,6 +6,15 @@ HTTPS is enforced and the domain certificate is approved. No desktop app or
 local web server is required to open the interface. A compatible ESP32-S3 with
 the browser-capable firmware is still required for real AirDrop use.
 
+## No-hardware experience
+
+[Open the interactive demo](https://w0x7ce.eu/AirBridge/?demo=1) in a modern browser.
+Sample devices, progress, cancellation and outcomes are explicitly simulated.
+The demo does not construct a serial session or request file/directory handles;
+exiting it starts the real interface disconnected. This is a guided product
+experience, not a cloud implementation of AWDL. Vercel is optional: any static
+HTTPS host can serve the same ZIP. No Gmail sign-in is needed.
+
 ## Automatic deployment
 
 Every push and pull request runs the complete [quality suite](continuous-delivery.md).
@@ -38,7 +47,7 @@ source is live and whether the assets match the checked artifact.
   the bridge. Only those user actions open permission prompts. No serial devices
   are enumerated or opened on page load.
 - Browser choosers do not display Windows COM numbers. The existing USB filter
-  and firmware factory-identity handshake still protect the configured board;
+  and firmware factory-identity handshake check a compatible, explicitly chosen board;
   use Device Manager to correlate ports if necessary. The site does not flash
   hardware or bypass that identity check.
 - A dismissed chooser can be retried. Permission-denied errors preserve a

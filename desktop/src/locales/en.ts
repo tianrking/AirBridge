@@ -171,7 +171,7 @@ export default {
     transport: "PC connection",
     currentLimits: "Current compatibility",
     limits:
-      "Mac native transfer verified. Up to 1 MiB for sending. iPhone, folders and external UART are not qualified yet. This firmware currently permits one configured Apple peer.",
+      "ESP32-S3 with 16 MiB flash and 8 MiB octal PSRAM. Sending is bounded to 1 MiB per file. Mac native transfers were verified on earlier development firmware; this public build still needs physical requalification. iPhone, folders and external UART remain unqualified.",
     reliability:
       "Long idle discovery remains under qualification. A failed or uncertain transfer is never automatically resent.",
     privacy:
@@ -186,7 +186,7 @@ export default {
     fileSelected: "File selected",
     recipientSelected: "Recipient selected",
     receivingAuto:
-      "The configured Apple peer is accepted automatically in this development firmware.",
+      "Files from the Apple peer you authorize are accepted automatically while the host is connected. Revoke access when finished.",
     appearance: "Appearance",
     appearanceHelp:
       "A calm space, in any light. Follow your system or choose a look.",
@@ -195,9 +195,27 @@ export default {
     system: "System",
     systemLight: "Currently light",
     systemDark: "Currently dark",
+    selectBridge: "Choose your bridge",
+    bridgePortHelp:
+      "Select the ESP32-S3 native USB port. Its factory identity is verified before the connection is accepted.",
+    noBridges:
+      "No compatible bridge found. Connect an ESP32-S3 through its native USB port and close other serial applications.",
+    authorizeToReceive: "Choose who can send to you",
+    authorizeHelp:
+      "Select a nearby Apple device, then allow receiving from it. Other senders stay blocked.",
+    authorizePeer: "Allow selected device",
+    revokePeer: "Revoke receiving access",
+    authorizedPeer: "Allowed sender",
+    tryDemo: "Explore the demo",
+    demoLabel: "Interactive demo",
+    demoDisclosure:
+      "Sample devices and simulated transfers. No serial port, radio, file picker or disk writes are used.",
+    demoComplete: "Simulated result · no file was transferred",
+    exitDemo: "Use my bridge",
+    downloads: "Downloads & setup",
   },
   web: {
-    help: "Web Serial · Choose a receive folder, then connect the verified COM4 bridge. Keep this tab open and the computer awake during transfers. New firmware with hardware identity support is required.",
+    help: "Web Serial · Choose a receive folder, then select your compatible ESP32-S3 bridge. Keep this tab open and the computer awake during transfers.",
     noFolder: "Choose a receive folder before connecting.",
     receipt: "Save receipt",
     prepare: "Choose receive folder",

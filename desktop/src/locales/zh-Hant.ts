@@ -162,7 +162,7 @@ export default {
     transport: "電腦連線",
     currentLimits: "目前相容範圍",
     limits:
-      "已驗證 Mac 原生傳輸。傳送上限 1 MiB。iPhone、資料夾與外接 UART 尚未驗證。目前韌體僅允許一個設定的 Apple 對端。",
+      "需要 16 MiB Flash、8 MiB 八線式 PSRAM 的 ESP32-S3。每次傳送上限 1 MiB。先前開發韌體已驗證 Mac 原生傳輸；本公開版本仍需重新驗證實體互通。iPhone、資料夾與外部 UART 尚未通過驗證。",
     reliability:
       "長時間閒置後的可發現性仍在驗證。失敗或結果不確定的傳輸不會自動重送。",
     privacy: "檔案在本機透過橋接器傳輸，不需上傳雲端、登入帳號或安裝 Python。",
@@ -175,7 +175,8 @@ export default {
     today: "本次工作階段",
     fileSelected: "已選擇檔案",
     recipientSelected: "已選擇接收裝置",
-    receivingAuto: "開發韌體目前會自動接受已設定 Apple 對端的檔案。",
+    receivingAuto:
+      "連接上位機時，您授權的 Apple 裝置所傳送的檔案會自動獲准。使用完畢後請撤銷接收權限。",
     appearance: "外觀",
     appearanceHelp: "明暗之間，都舒適自在。跟隨系統或選擇喜歡的主題。",
     light: "淺色",
@@ -183,9 +184,27 @@ export default {
     system: "跟隨系統",
     systemLight: "目前為淺色",
     systemDark: "目前為深色",
+    selectBridge: "選擇橋接器",
+    bridgePortHelp:
+      "請選擇 ESP32-S3 原生 USB 連接埠。連線前會核對裝置回報的出廠識別。",
+    noBridges:
+      "尚未找到相容橋接器。請使用 ESP32-S3 原生 USB 介面連接，並關閉其他序列埠程式。",
+    authorizeToReceive: "選擇允許的傳送裝置",
+    authorizeHelp:
+      "先選擇附近的 Apple 裝置，再允許接收其檔案。其他傳送端仍會遭到封鎖。",
+    authorizePeer: "允許所選裝置",
+    revokePeer: "撤銷接收權限",
+    authorizedPeer: "允許的傳送端",
+    tryDemo: "體驗互動示範",
+    demoLabel: "互動示範",
+    demoDisclosure:
+      "此處使用範例裝置與模擬傳輸，不使用序列埠、無線電、檔案選擇器，也不寫入檔案。",
+    demoComplete: "模擬結果 · 未實際傳輸檔案",
+    exitDemo: "使用我的橋接器",
+    downloads: "下載與設定",
   },
   web: {
-    help: "Web Serial · 先選擇接收資料夾，再連接已核對的 COM4 橋接器。傳輸時請保持分頁開啟及電腦喚醒。需要支援硬體識別的新韌體。",
+    help: "Web Serial · 選擇接收資料夾，再選取相容的 ESP32-S3 橋接器。傳輸時請保持分頁開啟及電腦喚醒。",
     noFolder: "連線前，請先選擇接收資料夾。",
     receipt: "儲存驗證收據",
     prepare: "選擇接收資料夾",

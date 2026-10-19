@@ -110,6 +110,11 @@ impl Snapshot {
         let kind = event["event"].as_str().unwrap_or("");
         let time = now();
         match kind {
+            "pairing_updated" => {
+                if let Some(info) = self.bridge_info.as_mut() {
+                    info["paired_peer"] = event["paired_peer"].clone();
+                }
+            }
             "resolution_started" => {
                 self.resolving_peer = event["mac"].as_str().map(str::to_owned);
             }
@@ -129,7 +134,7 @@ impl Snapshot {
                 self.bridge_info = Some(serde_json::json!({
                     "protocol":caps["protocol"], "max_file":caps["max_file"],
                     "chunk_bytes":caps["chunk_bytes"], "hardware_id":caps["hardware_id"],
-                    "paired_peer":caps["paired_peer"], "usb_serial":event["usb_serial"],
+                    "pairing":caps["pairing"], "paired_peer":caps["paired_peer"], "usb_serial":event["usb_serial"],
                     "port":event["port"], "connected_at":time
                 }));
                 self.names.clear();

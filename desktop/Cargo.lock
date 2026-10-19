@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "airbridge-desktop"
-version = "0.4.0"
+version = "0.0.1"
 dependencies = [
  "airbridge-host",
  "serde",
@@ -33,7 +33,7 @@ dependencies = [
 
 [[package]]
 name = "airbridge-host"
-version = "0.4.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

@@ -16,6 +16,24 @@ Cada push y PR ejecuta las pruebas; [las versiones etiquetadas requieren los mis
 
 </div>
 
+## Versión preliminar pública v0.0.1
+
+[Descargas de firmware y Windows](https://github.com/tianrking/AirBridge/releases/tag/v0.0.1) ·
+[Demostración sin hardware](https://w0x7ce.eu/AirBridge/?demo=1) ·
+[Guía del firmware (inglés)](docs/firmware-release.md)
+
+Incluye firmware ZIP para ESP32-S3 N16R8, instalador y ZIP portátil de Windows x64,
+y ZIP del sitio estático. La web HTTPS no necesita cuenta ni instalación; las
+transferencias reales requieren la placa y Chrome/Edge de escritorio o Tauri.
+La demostración identifica los dispositivos y transferencias simulados y no
+accede al puerto serie, radio ni archivos. Los paquetes de Windows no están firmados.
+La versión pública permite elegir la propia placa, genera una identidad TLS por
+placa y exige autorizar explícitamente al remitente. Estos cambios tienen pruebas
+automatizadas y compilación, pero todavía necesitan una nueva validación física.
+Los resultados nativos anteriores corresponden a la configuración de desarrollo.
+
+
+
 AirBridge utiliza un ESP32-S3 para Wi-Fi y Bluetooth y lo conecta a Windows mediante un puerto serie. Su núcleo portátil en C++17 implementa las tramas AWDL, la sincronización y el análisis del protocolo; ESP-IDF 6.1 proporciona el backend de radio. La aplicación de escritorio Tauri 2 utiliza React, TypeScript y un único actor serie en Rust.
 
 ## Aplicación web

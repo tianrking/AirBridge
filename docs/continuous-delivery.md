@@ -11,7 +11,9 @@ policies, path filters or `continue-on-error` test steps.
 | --- | --- | --- |
 | Web and Chromium acceptance | Locked npm install, unit tests, TypeScript/build, headless Chromium | JUnit, HTML report, failed-test screenshot/video/trace, JSON acceptance attachments |
 | Protocol and Windows host | Python contracts/release-policy checks, CMake/CTest C++ protocol checks, Rust formatting and workspace tests | Actions step logs |
-| Quality gate | Requires both jobs to report `success` | Failure, cancellation, skipped or absent result blocks the gate |
+| ESP32-S3 public firmware | Pinned ESP-IDF v6.1 image, N16R8 public build, merged-image packaging and extracted readback | Firmware ZIP and manifest |
+| Windows x64 application and installer | Tauri production binary and NSIS using the exact browser-tested frontend | Portable ZIP and installer |
+| Quality gate | Requires all four jobs to report `success` | Failure, cancellation, skipped or absent result blocks the gate |
 
 Browser checks use the production React components and Web Serial backend with a
 virtual serial transport. Storage tests write to **real Chromium OPFS**, close and
@@ -43,25 +45,30 @@ wave tempo and pause retention across navigation/reload.
 
 ## Release behavior
 
-Push a version tag such as `v0.4.0` **only when intentionally publishing a release**.
-The tag must exactly match `desktop/package.json`. The workflow checks the tagged
-source, runs every suite, downloads the exact tested web build, packages it with
-a per-file SHA256 manifest, reopens/verifies the ZIP, and verifies its archive
-checksum again immediately before creating the GitHub release. Only the final
-publish job receives `contents: write`; checks and packaging are read-only.
-Third-party actions are pinned to full commit SHAs. Pull requests do not receive
-release permissions, and `pull_request_target` is not used.
+Push a version tag such as `v0.0.1` only when intentionally publishing. Root
+`VERSION`, npm/lockfiles, Cargo/lockfile, Tauri and firmware agree or CI fails.
+The reusable suite produces a tested web artifact, a pinned ESP-IDF v6.1 firmware
+ZIP and Windows x64 installer/portable ZIP. The desktop reuses those exact web
+assets instead of rebuilding them. The public firmware contains no private peer,
+shared TLS key or NVS image; it generates a per-board identity on first boot.
 
-Any failed, cancelled or skipped required suite prevents both packaging and
-publishing. Package failure blocks publishing too. Python regression tests inspect
-these dependencies, exercise all 25 pairs of gate outcomes with the actual gate
-shell commands, and reject version drift or incomplete build assets.
+Release assembly requires all four deliverables from the same workflow/source
+commit. Archive manifests cover every file, with sizes and SHA256; archives are
+reopened and the flashing helper runs in verify-only mode. Missing/ambiguous
+components, tampered bytes and version/source drift block publication. The final
+job verifies `SHA256SUMS` again and creates a **prerelease** with the firmware ZIP,
+Windows portable ZIP, Windows installer, web ZIP and aggregate manifest/checksums.
+Only that job receives `contents: write`. Actions and the ESP-IDF container are
+pinned to immutable revisions. PRs cannot publish and no manual bypass is included.
 
-This workflow publishes a **static browser package** with no installer or firmware
-binary. The retained Tauri code is compiled/tested; native app signing and firmware
-release qualification remain separate. Owners can still publish manually outside
-Actions; repository-wide branch/tag protections are separate GitHub settings.
-No release is created merely by pushing an ordinary commit.
+Python policy checks execute the actual four-result gate with every individual
+failure, cancellation, skip and absent result. Browser tests also exercise the
+public demo in all five languages while throwing on any real serial/file request.
+The desktop is unsigned. Actual physical flashing, first-boot identity, RF/native
+AirDrop interoperability, installer UX on a clean Windows system and browser
+folder-picker/native transfer remain separate manual qualification gates.
+[Release notes](release-notes-v0.0.1.md) state these boundaries. Owners can still
+publish outside Actions; repository-wide protection settings are separate.
 
 Successful ordinary `main` commits now update [GitHub Pages](pages.md) after the
 same complete quality gate. PRs and other refs cannot deploy. The Pages job uses

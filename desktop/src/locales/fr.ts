@@ -173,7 +173,7 @@ export default {
     transport: "Connexion au PC",
     currentLimits: "Compatibilité actuelle",
     limits:
-      "Transferts Mac natifs vérifiés. Envoi jusqu’à 1 Mio. iPhone, dossiers et UART externe non encore validés. Ce micrologiciel autorise un seul appareil Apple configuré.",
+      "ESP32-S3 avec 16 Mio de flash et 8 Mio de PSRAM octale. Envoi limité à 1 Mio par fichier. Mac a été vérifié avec un ancien micrologiciel de développement ; cette version publique nécessite une nouvelle validation physique. iPhone, dossiers et UART externe non validés.",
     reliability:
       "La découverte après une longue période d’inactivité reste à valider. Aucun transfert échoué ou incertain n’est renvoyé automatiquement.",
     privacy:
@@ -189,7 +189,7 @@ export default {
     fileSelected: "Fichier sélectionné",
     recipientSelected: "Destinataire sélectionné",
     receivingAuto:
-      "L’appareil Apple configuré est accepté automatiquement par ce micrologiciel de développement.",
+      "Les fichiers de l’appareil Apple autorisé sont acceptés automatiquement tant que le PC est connecté. Révoquez l’accès une fois terminé.",
     appearance: "Apparence",
     appearanceHelp:
       "Un espace apaisant, à toute heure. Suivez le système ou choisissez un thème.",
@@ -198,9 +198,27 @@ export default {
     system: "Système",
     systemLight: "Actuellement clair",
     systemDark: "Actuellement sombre",
+    selectBridge: "Choisissez votre pont",
+    bridgePortHelp:
+      "Sélectionnez le port USB natif de l’ESP32-S3. Son identité d’usine est vérifiée avant d’accepter la connexion.",
+    noBridges:
+      "Aucun pont compatible détecté. Branchez l’ESP32-S3 par son port USB natif et fermez les autres applications série.",
+    authorizeToReceive: "Choisissez qui peut vous envoyer des fichiers",
+    authorizeHelp:
+      "Sélectionnez un appareil Apple à proximité, puis autorisez sa réception. Les autres expéditeurs restent bloqués.",
+    authorizePeer: "Autoriser l’appareil choisi",
+    revokePeer: "Révoquer la réception",
+    authorizedPeer: "Expéditeur autorisé",
+    tryDemo: "Explorer la démo",
+    demoLabel: "Démo interactive",
+    demoDisclosure:
+      "Appareils d’exemple et transferts simulés. Aucun port série, radio, sélecteur ou accès en écriture aux fichiers n’est utilisé.",
+    demoComplete: "Résultat simulé · aucun fichier transféré",
+    exitDemo: "Utiliser mon pont",
+    downloads: "Téléchargements et installation",
   },
   web: {
-    help: "Web Serial · Choisissez un dossier de réception, puis connectez le pont COM4 vérifié. Gardez cet onglet ouvert et le PC éveillé pendant les transferts. Un micrologiciel avec identification matérielle est requis.",
+    help: "Web Serial · Choisissez un dossier de réception, puis votre pont ESP32-S3. Gardez cet onglet ouvert et le PC éveillé.",
     noFolder: "Choisissez un dossier de réception avant de vous connecter.",
     receipt: "Enregistrer le justificatif",
     prepare: "Choisir le dossier de réception",

@@ -4,7 +4,7 @@ import {
   Lines,
   mac,
   MAX_SEND,
-  BOARD_ID,
+  factoryIdentity,
   type Event,
 } from "./protocol";
 import type { DiskDirectory, SerialPort } from "./platform";
@@ -99,9 +99,8 @@ export class Session {
         "Unsupported bridge capabilities",
       );
       check(
-        typeof hello.hardware_id === "string" &&
-          hello.hardware_id.toLowerCase() === BOARD_ID,
-        "Board identity missing or different. Use the verified replacement COM4 and firmware with hardware_id support",
+        factoryIdentity(hello.hardware_id),
+        "Missing or invalid factory identity. Select an ESP32-S3 with compatible AirBridge firmware",
       );
       check(!this.closing, "Session closed during handshake");
       this.capabilities = hello;

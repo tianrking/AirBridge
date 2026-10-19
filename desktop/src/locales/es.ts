@@ -171,7 +171,7 @@ export default {
     transport: "Conexión con el PC",
     currentLimits: "Compatibilidad actual",
     limits:
-      "Transferencia nativa verificada con Mac. Envíos de hasta 1 MiB. iPhone, carpetas y UART externo aún no están validados. Este firmware permite un dispositivo Apple configurado.",
+      "ESP32-S3 con 16 MiB de flash y 8 MiB de PSRAM octal. Envío hasta 1 MiB por archivo. Mac se verificó con firmware de desarrollo anterior; la versión pública requiere nueva validación física. iPhone, carpetas y UART externo no están validados.",
     reliability:
       "La visibilidad tras una espera prolongada sigue en validación. Las transferencias fallidas o inciertas nunca se reenvían automáticamente.",
     privacy:
@@ -187,7 +187,7 @@ export default {
     fileSelected: "Archivo seleccionado",
     recipientSelected: "Destinatario seleccionado",
     receivingAuto:
-      "Este firmware de desarrollo acepta automáticamente al dispositivo Apple configurado.",
+      "Los archivos del dispositivo Apple autorizado se aceptan automáticamente mientras el equipo está conectado. Revoca el acceso al terminar.",
     appearance: "Apariencia",
     appearanceHelp:
       "Un espacio sereno con cualquier luz. Sigue el sistema o elige un estilo.",
@@ -196,9 +196,27 @@ export default {
     system: "Sistema",
     systemLight: "Actualmente claro",
     systemDark: "Actualmente oscuro",
+    selectBridge: "Elige tu puente",
+    bridgePortHelp:
+      "Selecciona el puerto USB nativo del ESP32-S3. Se verifica su identidad de fábrica antes de aceptar la conexión.",
+    noBridges:
+      "No se encontró un puente compatible. Conecta el ESP32-S3 por su USB nativo y cierra otras aplicaciones serie.",
+    authorizeToReceive: "Elige quién puede enviarte archivos",
+    authorizeHelp:
+      "Selecciona un dispositivo Apple cercano y permite recibir de él. Los demás remitentes siguen bloqueados.",
+    authorizePeer: "Permitir dispositivo elegido",
+    revokePeer: "Revocar recepción",
+    authorizedPeer: "Remitente permitido",
+    tryDemo: "Explorar la demo",
+    demoLabel: "Demo interactiva",
+    demoDisclosure:
+      "Dispositivos de ejemplo y transferencias simuladas. No se usan puertos serie, radio, selectores ni escrituras de archivos.",
+    demoComplete: "Resultado simulado · no se transfirió ningún archivo",
+    exitDemo: "Usar mi puente",
+    downloads: "Descargas y configuración",
   },
   web: {
-    help: "Web Serial · Elige una carpeta de recepción y conecta el puente COM4 verificado. Mantén esta pestaña abierta y el equipo despierto durante las transferencias. Requiere firmware con identificación de hardware.",
+    help: "Web Serial · Elige una carpeta de recepción y selecciona tu puente ESP32-S3. Mantén la pestaña abierta y el equipo despierto.",
     noFolder: "Elige una carpeta de recepción antes de conectar.",
     receipt: "Guardar comprobante",
     prepare: "Elegir carpeta de recepción",

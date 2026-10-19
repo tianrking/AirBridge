@@ -13,6 +13,11 @@ use std::{
 };
 
 enum Command {
+    Pair {
+        peer: Option<String>,
+        port: u16,
+        complete: SyncSender<std::result::Result<(), String>>,
+    },
     Send {
         path: PathBuf,
         peer: String,
@@ -33,6 +38,20 @@ pub struct Actor {
 }
 impl Actor {
     pub fn start(directory: PathBuf, events: Events) -> Result<Self> {
+        Self::start_selected(
+            crate::ports::BridgePort {
+                port: crate::protocol::PORT.into(),
+                usb_serial: crate::protocol::USB_SERIAL.into(),
+            },
+            directory,
+            events,
+        )
+    }
+    pub fn start_selected(
+        selection: crate::ports::BridgePort,
+        directory: PathBuf,
+        events: Events,
+    ) -> Result<Self> {
         let (tx, rx) = mpsc::sync_channel(8);
         let stop = Arc::new(AtomicBool::new(false));
         let cancel = Arc::new(AtomicBool::new(false));
@@ -42,11 +61,16 @@ impl Actor {
         let worker_cancel = cancel.clone();
         let thread=thread::Builder::new().name("airbridge-serial".into()).spawn(move || {
             let run=||->Result<()> {
-                let mut client=Client::open(directory,events.clone(),worker_stop.clone(),worker_cancel)?;
+                let mut client=Client::open_selected(selection,directory,events.clone(),worker_stop.clone(),worker_cancel)?;
                 loop {
                     if worker_stop.load(Ordering::Relaxed) {return Ok(());}
                     if let Ok(command)=rx.try_recv() {
                         match command {
+                            Command::Pair{peer,port,complete}=>{
+                                let result=client.pair(peer.as_deref(),port).map_err(|e|format!("{e:#}"));
+                                worker_busy.store(false,Ordering::Release);
+                                let _=complete.send(result);
+                            }
                             Command::Send{path,peer,port}=>{
                                 if let Err(error)=client.send(&path,&peer,port) {
                                     (events)(json!({"event":"operation_error","message":format!("{error:#}")}));
@@ -87,6 +111,28 @@ impl Actor {
             return Err(error).context("Serial actor is busy or disconnected");
         }
         Ok(())
+    }
+    pub fn pair(
+        &self,
+        peer: Option<String>,
+        port: u16,
+    ) -> Result<mpsc::Receiver<std::result::Result<(), String>>> {
+        ensure!(
+            self.busy
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok(),
+            "A bridge operation is already active"
+        );
+        let (complete, result) = mpsc::sync_channel(1);
+        if let Err(e) = self.tx.try_send(Command::Pair {
+            peer,
+            port,
+            complete,
+        }) {
+            self.busy.store(false, Ordering::Release);
+            return Err(e).context("Serial actor is disconnected");
+        }
+        Ok(result)
     }
     pub fn status(&self) -> Result<()> {
         self.tx

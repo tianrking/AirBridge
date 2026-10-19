@@ -24,6 +24,7 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
+      - run: python3 ../scripts/check-version.py
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
@@ -68,17 +69,87 @@ jobs:
       - run: cargo fmt --manifest-path desktop/Cargo.toml --all -- --check
       - run: cargo test --manifest-path desktop/Cargo.toml --workspace --locked
 
+  firmware:
+    name: ESP32-S3 public firmware
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: espressif/idf:v6.1@sha256:81893c71bb5e570088901f21def8684c25cd2a9020281bd01b843a7655edb18c
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build pinned ESP-IDF 6.1 public firmware
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          python scripts/check-version.py
+          idf.py -C firmware -B "$GITHUB_WORKSPACE/work/firmware" -DIDF_TARGET=esp32s3 -DSDKCONFIG="$GITHUB_WORKSPACE/work/firmware/sdkconfig" -DAIRBRIDGE_PUBLIC_BUILD=ON -DAIRBRIDGE_PRESENCE_TX=ON -DAIRBRIDGE_IPV6_LINK=ON -DAIRBRIDGE_NATIVE_SERVICE=ON -DAIRBRIDGE_RAW_RATE_1M=ON build
+          python scripts/package-firmware.py --build work/firmware --tag "v$(cat VERSION)" --commit "$GITHUB_SHA" --output work/firmware-release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-esp32s3
+          path: work/firmware-release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  desktop:
+    name: Windows x64 application and installer
+    needs: web
+    runs-on: windows-2022
+    timeout-minutes: 35
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/work/desktop-target
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: tested-web
+          path: desktop/dist
+      - name: Build installer using the exact tested frontend
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run tauri -- build --ci --bundles nsis --config ../scripts/tauri-release.conf.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $version=(Get-Content ../VERSION -Raw).Trim()
+          python ../scripts/package-desktop.py --target "$env:CARGO_TARGET_DIR" --tag "v$version" --commit "$env:GITHUB_SHA" --output ../work/desktop-release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: public-windows-x64
+          path: work/desktop-release/*
+          if-no-files-found: error
+          retention-days: 7
+
   quality-gate:
     name: Quality gate
     if: always()
-    needs: [web, native]
+    needs: [web, native, firmware, desktop]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
-      - name: Require every suite to succeed
+      - name: Require every suite and deliverable to succeed
         env:
           WEB_RESULT: ${{ needs.web.result }}
           NATIVE_RESULT: ${{ needs.native.result }}
+          FIRMWARE_RESULT: ${{ needs.firmware.result }}
+          DESKTOP_RESULT: ${{ needs.desktop.result }}
         run: |
           test "$WEB_RESULT" = success
           test "$NATIVE_RESULT" = success
+          test "$FIRMWARE_RESULT" = success
+          test "$DESKTOP_RESULT" = success

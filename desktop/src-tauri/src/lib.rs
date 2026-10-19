@@ -66,7 +66,11 @@ fn dismiss_error(app: tauri::AppHandle, state: State<AppState>) -> Result<(), St
         .map_err(|error| error.to_string())
 }
 #[tauri::command]
-async fn connect_bridge(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+async fn connect_bridge(
+    selection: airbridge_host::ports::BridgePort,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let mut actor = locked(&state.actor)?;
     if actor.as_ref().is_some_and(|actor| !actor.finished()) {
         return Err("Bridge is already connected or connecting".into());
@@ -77,13 +81,43 @@ async fn connect_bridge(app: tauri::AppHandle, state: State<'_, AppState>) -> Re
     let handle = app.clone();
     publish(&app, &snapshot, serde_json::json!({"event":"connecting"}));
     *actor = Some(
-        Actor::start(
+        Actor::start_selected(
+            selection,
             directory,
             Arc::new(move |event| publish(&handle, &snapshot, event)),
         )
         .map_err(|e| e.to_string())?,
     );
     Ok(())
+}
+#[tauri::command]
+fn list_bridges() -> Result<Vec<airbridge_host::ports::BridgePort>, String> {
+    airbridge_host::ports::available().map_err(|e| e.to_string())
+}
+async fn authorize(
+    state: State<'_, AppState>,
+    peer: Option<String>,
+    port: u16,
+) -> Result<(), String> {
+    let result = locked(&state.actor)?
+        .as_ref()
+        .ok_or("Connect a bridge first")?
+        .pair(peer, port)
+        .map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        result.recv_timeout(std::time::Duration::from_secs(8))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn pair_peer(state: State<'_, AppState>, peer: String, port: u16) -> Result<(), String> {
+    authorize(state, Some(peer), port).await
+}
+#[tauri::command]
+async fn unpair_peer(state: State<'_, AppState>) -> Result<(), String> {
+    authorize(state, None, 0).await
 }
 #[tauri::command]
 async fn disconnect_bridge(state: State<'_, AppState>) -> Result<(), String> {
@@ -262,6 +296,9 @@ pub fn run() {
             get_snapshot,
             dismiss_error,
             connect_bridge,
+            list_bridges,
+            pair_peer,
+            unpair_peer,
             disconnect_bridge,
             choose_file,
             send_file,
