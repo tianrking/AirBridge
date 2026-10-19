@@ -16,6 +16,7 @@
 #include "discover.hpp"
 #include "ble_presence.hpp"
 #include "esp_heap_caps.h"
+#include "esp_mac.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -447,17 +448,24 @@ bool hexadecimal(const char* value, std::size_t size, std::uint8_t* result = nul
 }
 void reply(const serial::Command& command, bool okay, const char* reason, std::size_t offset = 0,
            bool remember = true) {
+    std::array<std::uint8_t, 6> hardware{};
+    // The stable factory identity is independent of the randomized AWDL MAC.
+    // Web Serial exposes VID/PID, but not the USB hardware serial string.
+    if (esp_efuse_mac_get_default(hardware.data()) != ESP_OK)
+        return;
     std::array<char, 512> line{};
     const int count =
         std::snprintf(line.data(), line.size(),
                       "{\"event\":\"command_reply\",\"sequence\":%lu,\"ok\":%s,\"reason\":\"%s\","
                       "\"offset\":%u,\"protocol\":2,\"max_file\":%u,\"chunk_bytes\":112,\"radio_"
                       "mac\":\"%02x:%02x:%02x:%02x:%02x:%02x\",\"resolve\":true,"
-                      "\"paired_peer\":\"%02x:%02x:%02x:%02x:%02x:%02x\"}\n",
+                      "\"paired_peer\":\"%02x:%02x:%02x:%02x:%02x:%02x\","
+                      "\"hardware_id\":\"%02x:%02x:%02x:%02x:%02x:%02x\"}\n",
                       static_cast<unsigned long>(command.sequence), okay ? "true" : "false", reason,
                       unsigned(offset), unsigned(maximum_file), identity[0], identity[1],
                       identity[2], identity[3], identity[4], identity[5],permitted_peer[0],permitted_peer[1],
-                      permitted_peer[2],permitted_peer[3],permitted_peer[4],permitted_peer[5]);
+                      permitted_peer[2],permitted_peer[3],permitted_peer[4],permitted_peer[5],
+                      hardware[0],hardware[1],hardware[2],hardware[3],hardware[4],hardware[5]);
     if (count > 0 && std::size_t(count) < line.size()) {
         if (remember) {
             replay.remember(command);

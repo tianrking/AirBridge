@@ -65,6 +65,14 @@ A `command_reply` includes `sequence`, `ok`, `reason`, `offset`, `protocol`,
 `max_file`, `chunk_bytes` and `radio_mac`. New resolver-capable builds additionally
 return `resolve:true` and `paired_peer`; the host checks this capability before
 issuing `RESOLVE`. Connecting USB does not initiate a manual network query.
+Browser-capable builds also return `hardware_id`, the factory eFuse base MAC,
+independent of the randomized `radio_mac`. This additive field leaves existing
+native clients compatible. Web Serial exposes USB VID/PID rather than the USB
+serial string: the user must select the already-verified replacement COM4 in the
+browser chooser; after HELLO the web backend requires factory identity
+`f0:9e:9e:1e:61:3c` before accepting transfer events or issuing transfer commands.
+Missing or different identities close the browser session. This identity binding
+prevents accidental board confusion; it is not cryptographic device authentication.
 Wrong offsets, bad digests, mismatched
 manifest sizes and incomplete staging never initiate native file delivery.
 
