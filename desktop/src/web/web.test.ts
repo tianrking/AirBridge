@@ -523,6 +523,68 @@ describe("browser workflow state", () => {
     await vi.waitFor(() => expect(bridge.snapshot.peers).toHaveLength(1));
     return { bridge, port, file };
   }
+  it("exposes handshake provenance and missing RSSI without inventing a reading", async () => {
+    const { bridge, port } = await connected();
+    expect(bridge.snapshot.bridge_info).toMatchObject({
+      protocol: 2,
+      max_file: 1048576,
+      chunk_bytes: 112,
+      hardware_id: BOARD_ID,
+      usb_serial: null,
+      port: null,
+    });
+    port.emit({
+      event: "scanner_status",
+      peers: [
+        {
+          mac: peer,
+          airdrop_advertised: true,
+          airdrop_port: 8770,
+          has_sync: true,
+          has_election: false,
+          root_metric: 0,
+          channel6_mask: 65535,
+        },
+      ],
+    });
+    await vi.waitFor(() => expect(bridge.snapshot.peers[0].rssi).toBe(null));
+    expect(bridge.snapshot.peers[0].observation).toMatchObject({
+      has_sync: true,
+      has_election: false,
+      root_metric: 0,
+      channel6_mask: 65535,
+    });
+    expect(bridge.snapshot.peers[0].name).toBe(null);
+    await bridge.call("disconnect_bridge");
+    expect(bridge.snapshot.bridge_info?.connected_at).toBeGreaterThan(0);
+  });
+  it("retains native names in history and scanner reports do not rewrite transfer timestamps", async () => {
+    const { bridge, port } = await connected();
+    port.emit({
+      event: "peer_identity",
+      mac: peer,
+      error: 0,
+      display_name: "Studio Mac",
+    });
+    await vi.waitFor(() =>
+      expect(bridge.snapshot.peers[0].name).toBe("Studio Mac"),
+    );
+    const selected = await bridge.call<{ id: string }>("choose_file");
+    let sending = false;
+    port.onCommand = (record) => {
+      if (record.includes(" SEND ")) sending = true;
+    };
+    await bridge.call("send_file", { peer, fileId: selected.id });
+    await vi.waitFor(() => expect(sending).toBe(true));
+    const stamp = bridge.snapshot.transfers[0].updated;
+    expect(bridge.snapshot.transfers[0].peer_name).toBe("Studio Mac");
+    port.emit({ event: "scanner_status", peers: [] });
+    await vi.waitFor(() => expect(bridge.snapshot.peers).toHaveLength(0));
+    expect(bridge.snapshot.transfers[0].updated).toBe(stamp);
+    await bridge.call("disconnect_bridge");
+    expect(bridge.snapshot.transfers[0].peer_name).toBe("Studio Mac");
+    expect(bridge.snapshot.transfers[0].state).toBe("uncertain");
+  });
   it("resolves real names without substituting DNS labels and expires stale advertisements", async () => {
     const { bridge, port } = await connected();
     expect(bridge.snapshot.peers[0].name).toBe(null);

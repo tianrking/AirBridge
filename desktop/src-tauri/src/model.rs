@@ -29,7 +29,8 @@ pub struct Peer {
     pub name_source: Option<String>,
     pub advertised: bool,
     pub port: u16,
-    pub rssi: i64,
+    pub rssi: Option<i64>,
+    pub observation: Value,
     pub last_seen: u64,
 }
 #[derive(Clone, Serialize)]
@@ -46,6 +47,10 @@ pub struct Transfer {
     pub directory: Option<String>,
     pub error: Option<String>,
     pub updated: u64,
+    pub started: u64,
+    pub peer_name: Option<String>,
+    pub file_count: usize,
+    pub files: Vec<Value>,
     #[serde(skip)]
     pub parts: BTreeMap<String, u64>,
 }
@@ -56,6 +61,7 @@ pub struct Snapshot {
     pub can_resolve: bool,
     pub connection: String,
     pub radio_mac: Option<String>,
+    pub bridge_info: Option<Value>,
     pub peers: Vec<Peer>,
     pub transfers: Vec<Transfer>,
     pub receive_directory: String,
@@ -71,6 +77,7 @@ impl Snapshot {
             can_resolve: false,
             connection: "disconnected".into(),
             radio_mac: None,
+            bridge_info: None,
             peers: Vec::new(),
             transfers: Vec::new(),
             receive_directory,
@@ -112,6 +119,13 @@ impl Snapshot {
                 self.error = None;
             }
             "connected" => {
+                let caps = &event["capabilities"];
+                self.bridge_info = Some(serde_json::json!({
+                    "protocol":caps["protocol"], "max_file":caps["max_file"],
+                    "chunk_bytes":caps["chunk_bytes"], "hardware_id":caps["hardware_id"],
+                    "paired_peer":caps["paired_peer"], "usb_serial":event["usb_serial"],
+                    "port":event["port"], "connected_at":time
+                }));
                 self.can_resolve = event["capabilities"]["resolve"] == true;
                 self.connection = "connected".into();
                 self.error = None;
@@ -126,8 +140,9 @@ impl Snapshot {
                 for transfer in &mut self.transfers {
                     if !matches!(
                         transfer.state.as_str(),
-                        "completed" | "failed" | "cancelled"
+                        "completed" | "failed" | "cancelled" | "uncertain"
                     ) {
+                        transfer.updated = time;
                         transfer.state = "uncertain".into();
                         transfer.error = Some("Connection closed before native completion".into());
                     }
@@ -144,13 +159,19 @@ impl Snapshot {
                         .filter_map(|peer| {
                             let mac = peer["mac"].as_str()?.to_owned();
                             let name = self.names.get(&mac).cloned();
+                            let port = peer["airdrop_port"].as_u64().and_then(|v| u16::try_from(v).ok()).unwrap_or(0);
                             Some(Peer {
                                 mac,
                                 name_source: name.as_ref().map(|_| "airdrop_discover".into()),
                                 name,
-                                advertised: peer["airdrop_advertised"] == true,
-                                port: peer["airdrop_port"].as_u64().unwrap_or(0) as u16,
-                                rssi: peer["rssi"].as_i64().unwrap_or(-100),
+                                advertised: peer["airdrop_advertised"] == true && port > 0,
+                                port,
+                                rssi: peer["rssi"].as_i64().filter(|v| (-127..=0).contains(v)),
+                                observation: serde_json::json!({
+                                    "host_label":peer["host_label"], "service_instance":peer["service_instance"],
+                                    "channel6_mask":peer["channel6_mask"], "root_metric":peer["root_metric"],
+                                    "has_sync":peer["has_sync"], "has_election":peer["has_election"]
+                                }),
                                 last_seen: time,
                             })
                         })
@@ -165,6 +186,11 @@ impl Snapshot {
                         .filter(|name| !name.is_empty()),
                 ) {
                     self.names.insert(mac.into(), name.into());
+                    for t in &mut self.transfers {
+                        if t.peer.as_deref() == Some(mac) {
+                            t.peer_name = Some(name.into());
+                        }
+                    }
                     for peer in &mut self.peers {
                         if peer.mac == mac {
                             peer.name = Some(name.into());
@@ -177,6 +203,11 @@ impl Snapshot {
                 let peer = self.outgoing().and_then(|transfer| transfer.peer.clone());
                 if let (Some(mac), Some(name)) = (peer, event["display_name"].as_str()) {
                     self.names.insert(mac.clone(), name.into());
+                    for t in &mut self.transfers {
+                        if t.peer.as_deref() == Some(mac.as_str()) {
+                            t.peer_name = Some(name.into());
+                        }
+                    }
                     for peer in &mut self.peers {
                         if peer.mac == mac {
                             peer.name = Some(name.into());
@@ -202,6 +233,16 @@ impl Snapshot {
                         directory: None,
                         error: None,
                         updated: time,
+                        started: time,
+                        peer_name: event["peer"]
+                            .as_str()
+                            .and_then(|mac| self.names.get(mac).cloned()),
+                        file_count: if send {
+                            1
+                        } else {
+                            event["files"].as_u64().unwrap_or(1) as usize
+                        },
+                        files: Vec::new(),
                         parts: BTreeMap::new(),
                     },
                 );
@@ -209,11 +250,15 @@ impl Snapshot {
             }
             "incoming_file" => {
                 if let Some(transfer) = self.incoming(event["transfer_id"].as_str().unwrap_or("")) {
-                    transfer.name = event["name"].as_str().unwrap_or("Incoming files").into();
+                    if transfer.file_count <= 1 {
+                        transfer.name = event["name"].as_str().unwrap_or("Incoming files").into();
+                    }
+                    transfer.updated = time;
                 }
             }
             "staging_progress" => {
                 if let Some(transfer) = self.outgoing() {
+                    transfer.updated = time;
                     transfer.done = event["bytes"].as_u64().unwrap_or(0);
                     transfer.progress_total =
                         event["total_bytes"].as_u64().unwrap_or(transfer.bytes);
@@ -228,10 +273,8 @@ impl Snapshot {
                     }
                     .into();
                     transfer.updated = time;
-                    if transfer.state == "connecting" {
-                        transfer.done = 0;
-                        transfer.progress_total = 0;
-                    }
+                    transfer.done = 0;
+                    transfer.progress_total = 0;
                 }
             }
             "outgoing_progress" => {
@@ -280,6 +323,12 @@ impl Snapshot {
                     }
                 }
             }
+            "incoming_verifying" => {
+                if let Some(transfer) = self.incoming(event["transfer_id"].as_str().unwrap_or("")) {
+                    transfer.state = "finishing".into();
+                    transfer.updated = time;
+                }
+            }
             "received" => {
                 if let Some(transfer) = self.incoming(event["transfer_id"].as_str().unwrap_or("")) {
                     transfer.state = "completed".into();
@@ -289,10 +338,17 @@ impl Snapshot {
                     transfer.directory = event["directory"]
                         .as_str()
                         .map(|path| display_path(Path::new(path)));
+                    transfer.files = event["files"].as_array().cloned().unwrap_or_default();
+                    transfer.file_count = transfer
+                        .files
+                        .iter()
+                        .filter(|file| file["metadata"] == false)
+                        .count();
                     transfer.sha256 = event["files"]
                         .as_array()
                         .and_then(|files| files.iter().find(|file| file["metadata"] == false))
                         .and_then(|file| file["sha256"].as_str())
+                        .filter(|_| transfer.file_count == 1)
                         .map(str::to_owned);
                 }
             }
@@ -307,6 +363,7 @@ impl Snapshot {
             "cancellation_requested" => {
                 if let Some(transfer) = self.outgoing() {
                     transfer.state = "cancelling".into();
+                    transfer.updated = time;
                 }
             }
             _ => {}
@@ -317,6 +374,32 @@ impl Snapshot {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn provenance_and_missing_values_are_preserved() {
+        let mut state = Snapshot::new("inbox".into());
+        state.apply(&json!({"event":"connected","port":"COM4","usb_serial":"verified", "capabilities":{"protocol":2,"max_file":1048576,"chunk_bytes":112,"radio_mac":"02:11:22:33:44:55"}}));
+        assert_eq!(state.bridge_info.as_ref().unwrap()["protocol"], 2);
+        assert!(state.bridge_info.as_ref().unwrap()["hardware_id"].is_null());
+        state.apply(&json!({"event":"peers","peers":[{"mac":"02:11:22:33:44:55","airdrop_advertised":true,"airdrop_port":8770,"root_metric":0,"has_sync":false}]}));
+        assert!(state.peers[0].rssi.is_none());
+        assert_eq!(state.peers[0].observation["root_metric"], 0);
+        assert_eq!(state.peers[0].observation["has_sync"], false);
+    }
+    #[test]
+    fn history_retains_names_and_all_verified_files() {
+        let mut state = Snapshot::new("inbox".into());
+        state.apply(&json!({"event":"peer_identity","mac":"02:11:22:33:44:55","error":0,"display_name":"Studio Mac"}));
+        state.apply(&json!({"event":"outgoing_started","transfer_id":"SEND","peer":"02:11:22:33:44:55","bytes":3}));
+        assert_eq!(state.transfers[0].peer_name.as_deref(), Some("Studio Mac"));
+        state.transfers[0].updated = 1;
+        state.apply(&json!({"event":"peers","peers":[]}));
+        assert_eq!(state.transfers[0].updated, 1);
+        state.apply(&json!({"event":"incoming_started","transfer_id":"RECV","files":2,"bytes":6}));
+        state.apply(&json!({"event":"received","transfer_id":"RECV","directory":"inbox/RECV","files":[{"name":"one","bytes":3,"metadata":false,"sha256":"a"},{"name":"two","bytes":3,"metadata":false,"sha256":"b"},{"name":"._one","bytes":0,"metadata":true,"sha256":"c"}]}));
+        assert_eq!(state.transfers[0].file_count, 2);
+        assert_eq!(state.transfers[0].files.len(), 3);
+        assert!(state.transfers[0].sha256.is_none());
+    }
     #[test]
     fn source_and_wire_progress_do_not_fake_delivery() {
         let mut state = Snapshot::new("inbox".into());

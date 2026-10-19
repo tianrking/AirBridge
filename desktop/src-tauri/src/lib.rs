@@ -133,7 +133,11 @@ fn send_file(file_id: String, peer: String, state: State<AppState>) -> Result<()
     let target = snapshot
         .peers
         .iter()
-        .find(|target| target.mac == peer && target.advertised)
+        .find(|target| {
+            target.mac == peer
+                && target.advertised
+                && model::now().saturating_sub(target.last_seen) < 10_000
+        })
         .ok_or("Recipient is no longer nearby")?;
     if model::now().saturating_sub(target.last_seen) > 10_000 {
         return Err("Recipient information expired; wait for discovery".into());
@@ -167,7 +171,11 @@ fn resolve_peer(peer: String, state: State<AppState>) -> Result<(), String> {
     let target = snapshot
         .peers
         .iter()
-        .find(|target| target.mac == peer && target.advertised)
+        .find(|target| {
+            target.mac == peer
+                && target.advertised
+                && model::now().saturating_sub(target.last_seen) < 10_000
+        })
         .ok_or("Recipient is no longer nearby")?;
     let port = target.port;
     drop(snapshot);

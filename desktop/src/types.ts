@@ -6,8 +6,22 @@ export interface Peer {
   name_source: string | null;
   advertised: boolean;
   port: number;
-  rssi: number;
+  rssi: number | null;
   last_seen: number;
+  observation?: {
+    host_label?: string | null;
+    service_instance?: string | null;
+    channel6_mask?: number | null;
+    root_metric?: number | null;
+    has_sync?: boolean | null;
+    has_election?: boolean | null;
+  };
+}
+export interface TransferFile {
+  name: string;
+  bytes: number;
+  sha256: string;
+  metadata: boolean;
 }
 export interface Transfer {
   id: string;
@@ -22,6 +36,20 @@ export interface Transfer {
   directory: string | null;
   error: string | null;
   updated: number;
+  started?: number;
+  peer_name?: string | null;
+  file_count?: number;
+  files?: TransferFile[];
+}
+export interface BridgeInfo {
+  protocol: number | null;
+  max_file: number | null;
+  chunk_bytes: number | null;
+  hardware_id: string | null;
+  usb_serial: string | null;
+  port: string | null;
+  paired_peer: string | null;
+  connected_at: number;
 }
 export interface Snapshot {
   can_resolve: boolean;
@@ -33,6 +61,7 @@ export interface Snapshot {
   transfers: Transfer[];
   receive_directory: string;
   error: string | null;
+  bridge_info?: BridgeInfo | null;
 }
 export interface SelectedFile {
   id: string;

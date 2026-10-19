@@ -118,6 +118,7 @@ export class Receiver {
         event: "incoming_started",
         transfer_id: id,
         bytes: total,
+        files: count,
         directory: `${this.root.name}/${name}`,
       });
       return;

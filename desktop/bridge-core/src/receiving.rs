@@ -261,6 +261,7 @@ impl Receiver {
                 fs::rename(&job.temporary, &destination)?;
                 job.published = Some(destination);
                 output.acknowledgement = Some(format!("COMMIT {nonce}\n").into_bytes());
+                output.event = Some(json!({"event":"incoming_verifying","transfer_id":job.id}));
             }
             "transfer_complete" => {
                 let job = self.job.as_mut().context("Completion without transfer")?;
@@ -329,7 +330,8 @@ mod tests {
             .handle(&json!({"event":"file_end","index":0,"bytes":3,"sha256":hash}))
             .unwrap();
         let ready=receiver.handle(&json!({"event":"transfer_ready","transfer_id":"TEST-1","nonce":"a".repeat(32),"files":1,"total_bytes":3})).unwrap();
-        assert!(ready.event.is_none());
+        assert_eq!(ready.event.as_ref().unwrap()["event"], "incoming_verifying");
+        assert_ne!(ready.event.as_ref().unwrap()["event"], "received");
         assert!(ready.acknowledgement.unwrap().starts_with(b"COMMIT "));
         assert!(receiver.handle(&json!({"event":"transfer_complete","transfer_id":"TEST-1","host_committed":true,"response_written":false})).is_err());
         let result=receiver.handle(&json!({"event":"transfer_complete","transfer_id":"TEST-1","host_committed":true,"response_written":true})).unwrap().event.unwrap();

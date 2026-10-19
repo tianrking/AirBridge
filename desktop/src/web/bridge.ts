@@ -3,6 +3,7 @@ import {
   type SelectedFile,
   type Snapshot,
   type Transfer,
+  type TransferFile,
 } from "../types";
 import {
   base64,
@@ -77,6 +78,10 @@ export class WebBridge {
       name: String(e.name ?? "Incoming files"),
       direction: send ? "send" : "receive",
       peer: send ? String(e.peer) : null,
+      peer_name: send ? (this.names.get(String(e.peer)) ?? null) : null,
+      file_count: send ? 1 : Number(e.files ?? 1),
+      started: Date.now(),
+      files: [],
       state: send ? "preparing" : "receiving",
       bytes: Number(e.bytes),
       done: 0,
@@ -102,6 +107,8 @@ export class WebBridge {
     this.snapshot.peers = this.snapshot.peers.map((p) =>
       p.mac === peer ? { ...p, name, name_source: "airdrop_discover" } : p,
     );
+    for (const t of this.snapshot.transfers)
+      if (t.peer === peer) t.peer_name = name;
   }
   private event = (e: Event) => {
     const outgoing = this.outgoing();
@@ -126,8 +133,44 @@ export class WebBridge {
                     Number.isInteger(port) &&
                     port > 0 &&
                     port <= 65535,
-                  port,
-                  rssi: typeof p.rssi === "number" ? p.rssi : -100,
+                  port:
+                    Number.isInteger(port) && port > 0 && port <= 65535
+                      ? port
+                      : 0,
+                  rssi:
+                    typeof p.rssi === "number" &&
+                    Number.isFinite(p.rssi) &&
+                    p.rssi >= -127 &&
+                    p.rssi <= 0
+                      ? p.rssi
+                      : null,
+                  observation: {
+                    host_label:
+                      typeof p.host_label === "string" ? p.host_label : null,
+                    service_instance:
+                      typeof p.service_instance === "string"
+                        ? p.service_instance
+                        : null,
+                    channel6_mask:
+                      typeof p.channel6_mask === "number" &&
+                      Number.isInteger(p.channel6_mask) &&
+                      p.channel6_mask >= 0 &&
+                      p.channel6_mask <= 65535
+                        ? p.channel6_mask
+                        : null,
+                    root_metric:
+                      typeof p.root_metric === "number" &&
+                      Number.isSafeInteger(p.root_metric) &&
+                      p.root_metric >= 0
+                        ? p.root_metric
+                        : null,
+                    has_sync:
+                      typeof p.has_sync === "boolean" ? p.has_sync : null,
+                    has_election:
+                      typeof p.has_election === "boolean"
+                        ? p.has_election
+                        : null,
+                  },
                   last_seen: Date.now(),
                 },
               ];
@@ -157,6 +200,7 @@ export class WebBridge {
               : ["accepted", "uploading"].includes(String(e.stage))
                 ? "sending"
                 : "connecting";
+          outgoing.updated = Date.now();
           outgoing.done = 0;
           outgoing.progress_total = 0;
         }
@@ -170,6 +214,7 @@ export class WebBridge {
               e.wire_bytes <= e.wire_total,
             "Invalid upload progress",
           );
+          outgoing.updated = Date.now();
           outgoing.done = e.wire_bytes;
           outgoing.progress_total = e.wire_total;
           outgoing.state =
@@ -189,7 +234,10 @@ export class WebBridge {
         break;
       case "incoming_file": {
         const t = this.incoming(e.transfer_id);
-        if (t) t.name = String(e.name);
+        if (t) {
+          if ((t.file_count ?? 1) <= 1) t.name = String(e.name);
+          t.updated = Date.now();
+        }
         break;
       }
       case "incoming_progress": {
@@ -197,32 +245,40 @@ export class WebBridge {
         if (t) {
           this.incomingParts.set(String(e.name), Number(e.bytes));
           t.done = [...this.incomingParts.values()].reduce((a, b) => a + b, 0);
+          t.updated = Date.now();
         }
         break;
       }
       case "incoming_verifying": {
         const t = this.incoming(e.transfer_id);
-        if (t) t.state = "finishing";
+        if (t) {
+          t.state = "finishing";
+          t.updated = Date.now();
+        }
         break;
       }
       case "received": {
         this.receipts.set(String(e.transfer_id), e);
+        if (this.receipts.size > 100)
+          this.receipts.delete(this.receipts.keys().next().value!);
         const t = this.incoming(e.transfer_id);
         if (t) {
           t.state = "completed";
           t.done = t.bytes;
           t.directory = String(e.directory);
-          const f = (e.files as { metadata: boolean; sha256: string }[]).find(
-            (f) => !f.metadata,
-          );
-          t.sha256 = f?.sha256 ?? null;
+          t.files = (e.files as TransferFile[]).map((f) => ({ ...f }));
+          t.file_count = t.files.filter((f) => !f.metadata).length;
+          t.sha256 =
+            t.file_count === 1
+              ? (t.files.find((f) => !f.metadata)?.sha256 ?? null)
+              : null;
+          t.updated = Date.now();
         }
         break;
       }
       default:
         return;
     }
-    if (outgoing) outgoing.updated = Date.now();
     this.publish();
   };
   private failure = (error: Error) => {
@@ -233,6 +289,7 @@ export class WebBridge {
     this.snapshot.peers = [];
     for (const t of this.snapshot.transfers)
       if (!terminal(t.state)) {
+        t.updated = Date.now();
         t.state = "uncertain";
         t.error = error.message;
       }
@@ -323,8 +380,12 @@ export class WebBridge {
           this.operation === "send" && this.session,
           "No outgoing transfer to cancel",
         );
+        if (this.cancelRequested) return null as T;
         this.cancelRequested = true;
-        if (this.outgoing()) this.outgoing()!.state = "cancelling";
+        if (this.outgoing()) {
+          this.outgoing()!.state = "cancelling";
+          this.outgoing()!.updated = Date.now();
+        }
         this.publish();
         await this.session.request("CANCEL");
         return null as T;
@@ -385,6 +446,19 @@ export class WebBridge {
       this.snapshot.connection = "connected";
       this.snapshot.radio_mac = String(caps.radio_mac);
       this.snapshot.can_resolve = caps.resolve === true;
+      this.snapshot.bridge_info = {
+        protocol: typeof caps.protocol === "number" ? caps.protocol : null,
+        max_file: typeof caps.max_file === "number" ? caps.max_file : null,
+        chunk_bytes:
+          typeof caps.chunk_bytes === "number" ? caps.chunk_bytes : null,
+        hardware_id:
+          typeof caps.hardware_id === "string" ? caps.hardware_id : null,
+        usb_serial: null,
+        port: null,
+        paired_peer:
+          typeof caps.paired_peer === "string" ? caps.paired_peer : null,
+        connected_at: Date.now(),
+      };
       clearInterval(this.expiry);
       this.expiry = setInterval(() => {
         if (
@@ -423,6 +497,7 @@ export class WebBridge {
     this.snapshot.peers = [];
     for (const t of this.snapshot.transfers)
       if (!terminal(t.state)) {
+        t.updated = Date.now();
         t.state = "uncertain";
         t.error = "Disconnected before native completion";
       }
@@ -514,6 +589,7 @@ export class WebBridge {
           ) {
             transfer = this.outgoing();
             if (transfer) {
+              transfer.updated = Date.now();
               transfer.done = offset + chunk.length;
               this.publish();
             }
@@ -568,6 +644,7 @@ export class WebBridge {
       }
       this.snapshot.error = String(e);
     } finally {
+      if (transfer) transfer.updated = Date.now();
       this.operation = null;
       this.publish();
     }

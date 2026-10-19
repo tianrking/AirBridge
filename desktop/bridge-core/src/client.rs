@@ -170,8 +170,8 @@ impl Client {
                         event["transfer_id"].as_str() == self.transfer_id.as_deref(),
                         "Unexpected transfer completion"
                     );
+                    // Native completion is held until send() checks the staged size and hash.
                     self.completion = Some(event.clone());
-                    (self.events)(event.clone());
                 }
                 "outgoing_peer" | "peer_resolved" => {
                     let name = String::from_utf8(
@@ -313,21 +313,49 @@ impl Client {
                 (self.events)(json!({"event":"cancellation_requested","transfer_id":id}));
             }
             if let Some(outcome) = self.completion.as_ref() {
-                ensure!(
-                    outcome["success"] == true && outcome["http_status"] == 200,
-                    "AirDrop did not complete (error {}, HTTP {}). The file was not automatically resent.",
-                    outcome["error"], outcome["http_status"]
-                );
-                ensure!(
-                    outcome["bytes"].as_u64() == Some(data.len() as u64)
-                        && outcome["sha256"] == hash,
-                    "Native completion differs from staged file"
-                );
+                if outcome["success"] != true || outcome["http_status"] != 200 {
+                    (self.events)(outcome.clone());
+                    bail!("AirDrop did not complete (error {}, HTTP {}). The file was not automatically resent.", outcome["error"], outcome["http_status"]);
+                }
+                validate_success(outcome, data.len(), &hash)?;
+                (self.events)(outcome.clone());
                 return Ok(());
             }
             self.poll()?;
         }
         self.request("CANCEL")?;
         bail!("Native transfer timed out; cancellation requested; destination result uncertain")
+    }
+}
+
+// This gate runs before publishing a successful host event to the desktop UI.
+fn validate_success(outcome: &Value, bytes: usize, hash: &str) -> Result<()> {
+    ensure!(
+        outcome["success"] == true
+            && outcome["http_status"] == 200
+            && outcome["bytes"].as_u64() == Some(bytes as u64)
+            && outcome["sha256"] == hash,
+        "Native completion differs from staged file"
+    );
+    Ok(())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn native_success_is_not_publishable_with_a_different_source() {
+        let hash = "a".repeat(64);
+        let valid = json!({"success":true,"http_status":200,"bytes":4097,"sha256":hash});
+        assert!(validate_success(&valid, 4097, &hash).is_ok());
+        for (key, value) in [
+            ("bytes", json!(4096)),
+            ("sha256", json!("b".repeat(64))),
+            ("http_status", json!(500)),
+            ("success", json!(false)),
+        ] {
+            let mut invalid = valid.clone();
+            invalid[key] = value;
+            assert!(validate_success(&invalid, 4097, &hash).is_err());
+        }
     }
 }
