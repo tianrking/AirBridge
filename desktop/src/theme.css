@@ -1,0 +1,463 @@
+/* Semantic colors are shared by the web and Tauri interfaces. Decorative radio
+   gradients retain their own hues; text and surfaces follow the active scheme. */
+:root,
+:root[data-theme="light"] {
+  --canvas: #f4f6f9;
+  --surface: #ffffff;
+  --surface-glass: #ffffffd9;
+  --surface-raised: #fcfdff;
+  --surface-soft: #f5f8fc;
+  --sidebar: #f9fafcde;
+  --ink: #26354b;
+  --muted: #5f7188;
+  --line: #e1e8f1;
+  --accent: #246cc8;
+  --accent-soft: #e6edf8;
+  --positive: #30795f;
+  --positive-soft: #edf7f2;
+  --warning: #946044;
+  --warning-soft: #fff8f3;
+  --disabled: #e8eef8;
+  --focus: #8db6f9;
+}
+:root[data-theme="dark"] {
+  --canvas: #0f1520;
+  --surface: #192330;
+  --surface-glass: #192330de;
+  --surface-raised: #1d2938;
+  --surface-soft: #141e2b;
+  --sidebar: #141d29eb;
+  --ink: #e5edf7;
+  --muted: #a6b7cc;
+  --line: #34465d;
+  --accent: #8abbff;
+  --accent-soft: #223b59;
+  --positive: #99dbbd;
+  --positive-soft: #1b3a32;
+  --warning: #f0bb96;
+  --warning-soft: #382a25;
+  --disabled: #29384c;
+  --focus: #79b4ff;
+}
+
+/* Theme controls are a labelled keyboard-operable group, with a persistent
+   choice indicator. Changing appearance never changes motion preferences. */
+.appearance-card {
+  flex-wrap: wrap;
+}
+.theme-choices {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+.theme-choices button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  min-width: 70px;
+  min-height: 65px;
+  padding: 12px 10px;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+}
+.theme-choices button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow:
+    0 2px 7px #0d223b18,
+    0 0 0 1px var(--line);
+}
+.theme-choices button:hover:not([aria-pressed="true"]) {
+  background: var(--accent-soft);
+}
+.theme-status {
+  font-size: 10px !important;
+  color: var(--accent) !important;
+}
+:root[data-theme] {
+  color: var(--ink);
+  background: var(--canvas);
+}
+:root[data-theme] select {
+  color: var(--ink);
+  background-color: var(--surface-soft);
+}
+:root[data-theme] option {
+  color: var(--ink);
+  background: var(--surface);
+}
+:root[data-theme] :is(button, input, select, summary):focus-visible {
+  outline-color: var(--focus);
+}
+:root[data-theme] :is(h1, .share-page h1) {
+  color: var(--ink);
+}
+:root[data-theme] .mini-bridge strong {
+  color: var(--ink);
+}
+:root[data-theme]
+  :is(
+    .discovery-empty p,
+    .discovery-empty h3,
+    .discovery-label h2,
+    .discovery-status,
+    .discovery-footer,
+    .discovery-hub > span,
+    .peer-subtitle,
+    .peer-foot,
+    .access-privacy,
+    .browser-access
+  ) {
+  color: var(--muted);
+}
+:root[data-theme] .access-available {
+  color: var(--positive);
+}
+:root[data-theme] .primary:not(:disabled) {
+  color: #fff;
+}
+:root[data-theme] .primary:disabled {
+  background: var(--disabled);
+  color: var(--muted);
+}
+:root[data-theme] .setting-card select {
+  background-color: var(--surface-soft);
+}
+:root[data-theme] .nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: none;
+}
+:root[data-theme] .count {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+:root[data-theme] .segmented {
+  background: var(--surface-soft);
+}
+:root[data-theme] .segmented button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--accent);
+}
+:root[data-theme] .status-pill.is-success,
+:root[data-theme] .app-dialog .confirmation {
+  background: var(--positive-soft);
+  color: var(--positive);
+  border-color: var(--line);
+}
+:root[data-theme] .status-pill.is-available {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+:root[data-theme] .error-banner,
+:root[data-theme] .app-dialog .detail-error {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .topbar {
+  background: #15202de8;
+}
+:root[data-theme="dark"] .setting-icon,
+:root[data-theme="dark"] .dialog-glyph {
+  background: linear-gradient(145deg, #263950, #1c2c40);
+  color: #a8c7f0;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .discovery-stage {
+  background: linear-gradient(145deg, #19283bed, #17283fdd 55%, #1b2b43de);
+  border-color: #40597980;
+  box-shadow:
+    0 16px 50px -30px #050a1266,
+    inset 0 0 0 1px #a5cfff08;
+}
+:root[data-theme="dark"] .ambient-field {
+  opacity: 0.58;
+}
+:root[data-theme="dark"] .discovery-empty h3,
+:root[data-theme="dark"] .discovery-label h2,
+:root[data-theme="dark"] .discovery-stage .peer-name,
+:root[data-theme="dark"] .discovery-hub strong,
+:root[data-theme="dark"] .browser-access-heading strong {
+  color: var(--ink);
+}
+:root[data-theme="dark"] .discovery-empty p,
+:root[data-theme="dark"] .discovery-stage .peer-subtitle,
+:root[data-theme="dark"] .discovery-stage .peer-foot,
+:root[data-theme="dark"] .discovery-status,
+:root[data-theme="dark"] .discovery-footer,
+:root[data-theme="dark"] .discovery-label,
+:root[data-theme="dark"] .discovery-hub > span {
+  color: var(--muted);
+}
+:root[data-theme="dark"] .discovery-symbol {
+  background: linear-gradient(145deg, #30496b, #243953);
+  border-color: #4d6684;
+  color: #bdd8ff;
+}
+:root[data-theme="dark"] .discovery-footer {
+  background: #0d192640;
+  border-color: #597ba332;
+}
+:root[data-theme="dark"] .discovery-rings > span {
+  border-color: #8bbcff45;
+}
+:root[data-theme="dark"] .discovery-rings > span:last-child {
+  background: #6eabf008;
+}
+:root[data-theme="dark"] .signal-waves > span {
+  border-color: #8cbdff8c;
+}
+:root[data-theme="dark"] .is-transferring .signal-waves > span {
+  border-color: #b0d2ffcc;
+}
+:root[data-theme="dark"] .discovery-stage .peer-icon {
+  background: linear-gradient(145deg, #344d6e, #23364e);
+  color: #bdd7fa;
+  border-color: #526a88;
+}
+:root[data-theme="dark"] .discovery-stage .peer-card.selected .peer-icon {
+  color: #fff;
+}
+:root[data-theme="dark"] .discovery-stage .peer-selected {
+  border-color: #1c304b;
+}
+:root[data-theme="dark"] .signal-toggle,
+:root[data-theme="dark"] .peer-info {
+  background: #253a52b0;
+  color: #bad6f8;
+  border-color: #526b88;
+}
+:root[data-theme="dark"] .signal-toggle:hover:not(:disabled) {
+  background: #314c6a;
+  color: #fff;
+}
+:root[data-theme="dark"] .hub-icon {
+  background: #243650;
+  box-shadow: 0 0 0 5px #6daaff16;
+}
+:root[data-theme="dark"] .device-count {
+  background: #233c59;
+  color: #c6dcfa;
+}
+:root[data-theme="dark"] .peer-progress .peer-progress-value {
+  stroke: #9bcbff;
+}
+:root[data-theme="dark"] .peer-progress .peer-progress-track {
+  stroke: #aacfff32;
+}
+:root[data-theme="dark"] .browser-access {
+  background: #192b3acc;
+  color: var(--muted);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .needs-browser {
+  background: #342e24aa;
+}
+:root[data-theme="dark"] .access-symbol {
+  color: #acd1ff;
+  background: #284260;
+}
+:root[data-theme="dark"] .needs-browser .access-symbol {
+  background: #4b3d29;
+  color: #e5c995;
+}
+:root[data-theme="dark"] .access-available {
+  color: var(--positive);
+}
+:root[data-theme="dark"] .access-privacy {
+  color: var(--muted);
+}
+:root[data-theme="dark"] .access-instructions a,
+:root[data-theme="dark"] .browser-access summary {
+  color: var(--accent);
+}
+:root[data-theme="dark"] .transfer-row .file-icon,
+:root[data-theme="dark"] .large-file {
+  background: #243b58;
+  color: #b2d3ff;
+}
+:root[data-theme="dark"] .bridge-glyph:not(.online) {
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+:root[data-theme="dark"] .progress {
+  background: var(--line);
+}
+:root[data-theme="dark"] .transfer-row .file-icon.is-incoming,
+:root[data-theme="dark"] .receive-symbol,
+:root[data-theme="dark"] .bridge-glyph.online {
+  background: var(--positive-soft);
+  color: var(--positive);
+}
+:root[data-theme="dark"] .verified-file summary {
+  color: var(--positive);
+}
+:root[data-theme="dark"] .preview-note {
+  background: var(--surface-soft);
+}
+:root[data-theme="dark"] .app-dialog {
+  border-color: var(--line);
+  box-shadow: 0 25px 100px #0009;
+}
+:root[data-theme="dark"] .app-dialog::backdrop {
+  background: #050b16a0;
+}
+:root[data-theme="dark"] .dialog-actions .danger {
+  background: #a54f46;
+}
+
+/* Localized copy is allowed to wrap. Technical identities remain isolated from
+   surrounding bidi text; geometric animation coordinates are never mirrored. */
+.theme-choices span,
+.setting-copy,
+.setting-card button,
+.nav-item {
+  overflow-wrap: anywhere;
+}
+.nav-item {
+  height: auto;
+  min-height: 45px;
+  padding-block: 12px;
+}
+.setting-card select {
+  max-width: 100%;
+}
+.setting-card > .secondary {
+  max-width: 100%;
+  flex-shrink: 0;
+}
+.browser-access-heading > div {
+  min-width: 0;
+}
+.topbar {
+  gap: 18px;
+}
+.topbar-status {
+  text-align: end;
+}
+.bridge-glyph,
+.bridge-strip > svg,
+.receive-symbol,
+.transfer-outcome svg {
+  flex-shrink: 0;
+}
+.bridge-strip > div {
+  min-width: 0;
+}
+.transfer-meta {
+  flex-wrap: wrap;
+}
+.transfer-content strong {
+  line-height: 1.6;
+}
+.copy-value code {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+.technical-value {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.about-card dd,
+.folder-path bdi {
+  overflow-wrap: anywhere;
+}
+.dialog-heading h2 {
+  unicode-bidi: plaintext;
+}
+.peer-name,
+.transfer-content strong {
+  unicode-bidi: plaintext;
+}
+.discovery-status {
+  line-height: 1.6;
+}
+:root[dir="rtl"] .setting-card select {
+  background-position: left 12px center;
+}
+:root[dir="rtl"] .directional-icon {
+  transform: scaleX(-1);
+}
+:root[lang="ar"] {
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+:root[lang="ar"] :is(h1, h2, h3, .eyebrow, .brand, .hash-block label) {
+  letter-spacing: normal;
+}
+:root[lang="ar"] h1 {
+  line-height: 1.6;
+}
+:root[lang="ar"] .nav-item {
+  line-height: 1.7;
+}
+:root[lang="ar"] .discovery-empty h3 {
+  line-height: 1.8;
+}
+:root[lang="ar"] .peer-name {
+  line-height: 1.8;
+}
+@media (max-width: 720px) {
+  .theme-choices {
+    width: 100%;
+  }
+  .theme-choices button {
+    flex: 1;
+    min-width: 0;
+  }
+  .appearance-card .setting-copy {
+    flex-basis: calc(100% - 65px);
+  }
+  .setting-card select {
+    width: 100%;
+  }
+  .nav-item {
+    min-height: 38px;
+    padding-block: 8px;
+  }
+  .sidebar {
+    gap: 12px;
+  }
+  .sidebar nav {
+    min-width: 0;
+  }
+  .brand {
+    flex-shrink: 0;
+  }
+  .about-card dl > div {
+    flex-wrap: wrap;
+    gap: 5px 15px;
+  }
+  .about-card dd {
+    max-width: 100%;
+  }
+  .discovery-header {
+    flex-wrap: wrap;
+  }
+  .discovery-actions {
+    margin-inline-start: auto;
+  }
+  .topbar-status {
+    font-size: 11px;
+  }
+  .transfer-outcome {
+    max-width: 34%;
+  }
+  .transfer-outcome > span {
+    flex-wrap: wrap;
+    justify-content: end;
+    text-align: end;
+  }
+  footer {
+    line-height: 1.8;
+    flex-wrap: wrap;
+  }
+}

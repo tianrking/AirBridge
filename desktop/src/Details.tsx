@@ -16,7 +16,7 @@ export function CopyValue({ value, copy }: { value: string; copy: Copy }) {
   useEffect(() => () => clearTimeout(timer.current), []);
   return (
     <span className="copy-value">
-      <code>{value}</code>
+      <code dir="ltr">{value}</code>
       <button
         type="button"
         className="icon-button"
@@ -55,7 +55,9 @@ export function DetailRow({
   return (
     <div className="detail-row">
       <dt>{label}</dt>
-      <dd>{children}</dd>
+      <dd>
+        <bdi dir="auto">{children}</bdi>
+      </dd>
     </div>
   );
 }
@@ -223,11 +225,13 @@ export function BridgeDetails({
           {info?.protocol ?? copy.unknownValue}
         </DetailRow>
         <DetailRow label={copy.sendLimit}>
-          {info?.max_file ? formatBytes(info.max_file) : copy.unknownValue}
+          {info?.max_file
+            ? formatBytes(info.max_file, language)
+            : copy.unknownValue}
         </DetailRow>
         <DetailRow label={copy.chunkSize}>
           {info?.chunk_bytes
-            ? formatBytes(info.chunk_bytes)
+            ? formatBytes(info.chunk_bytes, language)
             : copy.unknownValue}
         </DetailRow>
         <DetailRow label={copy.permittedPeer}>

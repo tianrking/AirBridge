@@ -44,7 +44,8 @@
   white-space: nowrap;
 }
 .browser-access details {
-  padding: 0 20px 13px 66px;
+  padding-block: 0 13px;
+  padding-inline: 66px 20px;
 }
 .browser-access summary {
   cursor: pointer;
@@ -58,15 +59,16 @@
   outline-offset: 3px;
 }
 .access-instructions {
-  padding: 12px 6px 2px 0;
+  padding-block: 12px 2px;
+  padding-inline: 0 6px;
   max-width: 660px;
 }
 .access-instructions ol {
   margin: 0 0 12px;
-  padding-left: 16px;
+  padding-inline-start: 16px;
 }
 .access-instructions li {
-  padding-left: 4px;
+  padding-inline-start: 4px;
   margin-bottom: 7px;
 }
 .access-privacy {
@@ -100,7 +102,7 @@
     padding: 14px 14px 10px;
   }
   .browser-access details {
-    padding-left: 60px;
+    padding-inline-start: 60px;
   }
   .access-available {
     display: none;

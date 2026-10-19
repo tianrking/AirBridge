@@ -26,15 +26,18 @@ context; tests never select a physical serial port or request a Windows folder.
 These checks do not replace the [physical/native acceptance gates](web-qualification.md).
 
 The motion checks also exercise expanding waves, transfer tempo, disconnect,
-pause/resume, keyboard controls, runtime reduced motion, three-language labels,
+pause/resume, keyboard controls, runtime reduced motion, localized labels,
 device disappearance and a 390px layout. Visibility-event injection checks
 background pause logic; actual OS suspension remains a hardware-session check.
 
 First hosted acceptance: [CI run 39235593497](https://github.com/tianrking/AirBridge/actions/runs/39235593497)
 passed all three jobs for `02dfedd`. It ran 83 frontend unit tests, the initial
 three browser tests, 26 Python tests, 19 Rust tests and 346 C++ protocol checks.
-The current motion and browser-access extensions bring the suite to 93 frontend
-unit tests and 20 browser tests. The additional motion checks exercise reversible
+The motion, browser-access and localization extensions bring the suite to 103 frontend
+unit tests and 38 browser tests. The five-language/two-theme matrix checks desktop
+and mobile layouts, readable controls, computed text contrast, permission denial,
+RTL inspectors and preference persistence; its screenshots are included in the
+report. See [locale and theme acceptance](localization-and-appearance.md). The additional motion checks exercise reversible
 departure, interpolated ring progress, selection, unknown progress, phase-preserving
 wave tempo and pause retention across navigation/reload.
 

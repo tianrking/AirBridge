@@ -2,8 +2,10 @@
 
 The Web Serial application and Tauri desktop application share the same React
 surfaces. The interface uses quiet blue accents, consistent rounded controls,
-restrained motion and explicit status text. English is the default; Traditional
-Chinese and Spanish include every new field and action.
+restrained motion and explicit status text. English is the default; Spanish,
+French, Traditional Chinese and Arabic cover the interface, including browser
+permissions. Light, Dark and System appearance share semantic colors; Arabic
+uses RTL layout. See [languages and appearance](localization-and-appearance.md).
 
 ## Devices
 

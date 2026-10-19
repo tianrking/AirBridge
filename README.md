@@ -69,7 +69,7 @@ does not qualify the new browser path.
 
 ## Desktop application
 
-The desktop includes device selection, native file and folder dialogs, outgoing and incoming progress, cancellation, checked receive locations and transfer details. English is the default; Traditional Chinese and Spanish are available in Settings. Names come from native `/Discover`, with an explicit fallback when unresolved.
+The desktop includes device selection, native file and folder dialogs, outgoing and incoming progress, cancellation, checked receive locations and transfer details. English is the default; Spanish, French, Traditional Chinese and Arabic are available in Settings. The shared web/desktop interface supports Light, Dark and System appearance, including Arabic RTL layout. [Language and appearance guide](docs/localization-and-appearance.md). Names come from native `/Discover`, with an explicit fallback when unresolved.
 
 [Desktop build and usage](desktop/README.md) · [Measured desktop status](docs/desktop-qualification.md)
 

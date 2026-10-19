@@ -54,6 +54,20 @@ The build-local TLS identity remains private. The firmware binary is not include
 in the static web delivery. Existing native clients ignore the additive hardware
 identity field and retain their original USB-serial check.
 
+## Language and appearance acceptance — 2026-10-19
+
+The shared interface now has five complete locales: English (default), Spanish,
+French, Traditional Chinese and Arabic. The latest automated suite has **103
+frontend unit tests** and **38 browser tests**, including a five-language ×
+two-theme matrix at desktop and 390px widths. It checks production navigation,
+permission denial, RTL, detail dialogs, preference persistence, system-scheme
+changes, horizontal overflow and computed setting-text contrast. Matrix PNGs are
+attached to the Playwright report. See [architecture and coverage](localization-and-appearance.md).
+
+Device and checked-receive dialog checks use disclosed synthetic data. These
+localization/theme results do not qualify new physical serial or native AirDrop
+transfers. The unchanged hardware acceptance below is still required.
+
 ## Deferred hardware acceptance
 
 Windows enumerated no serial ports. The user explicitly requested completing

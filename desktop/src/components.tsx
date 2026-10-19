@@ -17,6 +17,7 @@ import { Dialog } from "./Dialog";
 import { CopyValue, DetailRow } from "./Details";
 import { progressOf, timeLabel, transferName } from "./presentation";
 import type { Copy } from "./i18n";
+import { numberLocale } from "./locales/registry";
 import {
   formatBytes,
   terminal,
@@ -131,7 +132,7 @@ export function TransferRow({
     <button
       className={`transfer-row state-${transfer.state}`}
       onClick={onDetails}
-      aria-label={`${copy.details}: ${transferName(transfer, copy)}`}
+      aria-label={`${copy.details}: ${transferName(transfer, copy, language)}`}
     >
       <span
         className={`file-icon ${transfer.direction === "receive" ? "is-incoming" : ""}`}
@@ -139,19 +140,21 @@ export function TransferRow({
         <File size={22} strokeWidth={1.5} />
       </span>
       <span className="transfer-content">
-        <strong>{transferName(transfer, copy)}</strong>
+        <strong>{transferName(transfer, copy, language)}</strong>
         <span className="transfer-meta">
           {transfer.direction === "send" ? (
             <ArrowUpRight size={13} />
           ) : (
             <ArrowDownLeft size={13} />
           )}
-          {transfer.peer_name ??
-            (transfer.direction === "send"
-              ? (transfer.peer ?? copy.appleDevice)
-              : copy.senderUnknown)}
+          <bdi dir="auto">
+            {transfer.peer_name ??
+              (transfer.direction === "send"
+                ? (transfer.peer ?? copy.appleDevice)
+                : copy.senderUnknown)}
+          </bdi>
           <span>·</span>
-          {formatBytes(transfer.bytes)}
+          {formatBytes(transfer.bytes, language)}
         </span>
         {!terminal(transfer.state) ? (
           <span
@@ -193,7 +196,7 @@ export function TransferRow({
           {timeLabel(transfer.updated, language, copy.unknownValue)}
         </time>
       </span>
-      <ChevronRight size={15} className="muted" />
+      <ChevronRight size={15} className="muted directional-icon" />
     </button>
   );
 }
@@ -234,7 +237,7 @@ export function TransferDetails({
         : copy.archiveProgress;
   return (
     <Dialog
-      title={transferName(transfer, copy)}
+      title={transferName(transfer, copy, language)}
       eyebrow={copy.details}
       icon={<File size={29} strokeWidth={1.4} />}
       onClose={onClose}
@@ -263,7 +266,12 @@ export function TransferDetails({
           <div>
             <span>{progressLabel}</span>
             <strong>
-              {progress === null ? "—" : `${Math.floor(progress)}%`}
+              {progress === null
+                ? "—"
+                : new Intl.NumberFormat(numberLocale(language), {
+                    style: "percent",
+                    maximumFractionDigits: 0,
+                  }).format(Math.floor(progress) / 100)}
             </strong>
           </div>
           <div
@@ -280,15 +288,17 @@ export function TransferDetails({
       ) : null}
       <dl className="detail-list">
         <DetailRow label={copy.byteCount}>
-          {formatBytes(transfer.bytes)}{" "}
+          {formatBytes(transfer.bytes, language)}{" "}
           <span className="muted">
-            ({transfer.bytes.toLocaleString(language)} B)
+            ({transfer.bytes.toLocaleString(numberLocale(language))} B)
           </span>
         </DetailRow>
         <DetailRow
           label={transfer.direction === "send" ? copy.recipient : copy.sender}
         >
-          {transfer.peer_name ?? transfer.peer ?? copy.senderUnknown}
+          <bdi dir="auto">
+            {transfer.peer_name ?? transfer.peer ?? copy.senderUnknown}
+          </bdi>
         </DetailRow>
         <DetailRow label={copy.startedAt}>
           {timeLabel(transfer.started, language, copy.unknownValue)}
@@ -314,11 +324,11 @@ export function TransferDetails({
             <details key={file.name} className="verified-file">
               <summary>
                 <span>
-                  {file.name}
+                  <bdi dir="auto">{file.name}</bdi>
                   <small>
                     {file.metadata
                       ? copy.metadataFile
-                      : formatBytes(file.bytes)}
+                      : formatBytes(file.bytes, language)}
                   </small>
                 </span>
                 <CheckCircle2 size={15} />
@@ -357,7 +367,7 @@ export function TransferDetails({
           ) : null}
           {transfer.directory ? (
             <DetailRow label={copy.receiveFolder}>
-              {transfer.directory}
+              <bdi dir="auto">{transfer.directory}</bdi>
             </DetailRow>
           ) : null}
         </dl>

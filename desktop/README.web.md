@@ -8,6 +8,10 @@ Device arrivals, reversible departures, selection and transfer progress use a
 [shared motion system](../docs/discovery-motion.md), without changing the native
 confirmation or checked-file publication rules.
 
+Settings now offers English (default), Spanish, French, Traditional Chinese and
+Arabic, with Light, Dark or System appearance. Arabic uses a full RTL layout.
+[Language, appearance and automated matrix coverage](../docs/localization-and-appearance.md).
+
 ![Actual English browser interface, disconnected](../docs/images/web-en-disconnected.png)
 
 *Actual Chrome capture with no hardware connected; no simulated peers or transfers.*

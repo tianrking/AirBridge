@@ -35,7 +35,7 @@ vuelta nativa por AirDrop. La evidencia anterior del CLI no valida la ruta web.
 
 ## Aplicación de escritorio
 
-Incluye selección de dispositivos, diálogos nativos de archivos y carpetas, progreso bidireccional, cancelación, ubicación de recepción y detalles de transferencia. Inglés por defecto, con chino tradicional y español en Ajustes. Los nombres proceden de `/Discover`; los nombres sin resolver se indican explícitamente.
+Incluye selección de dispositivos, diálogos nativos de archivos y carpetas, progreso bidireccional, cancelación, ubicación de recepción y detalles de transferencia. Inglés por defecto, con español, francés, chino tradicional y árabe en Ajustes. La interfaz web y de escritorio admite los temas Claro, Oscuro y Sistema, con diseño de derecha a izquierda para árabe. [Idiomas y apariencia](docs/localization-and-appearance.md). Los nombres proceden de `/Discover`; los nombres sin resolver se indican explícitamente.
 
 [Compilación y uso](desktop/README.md) · [Estado medido del escritorio](docs/desktop-qualification.md)
 

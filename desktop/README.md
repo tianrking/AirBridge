@@ -66,8 +66,10 @@ current application session; it is not a persistent transfer-history database.
 
 ## Languages and diagnostics
 
-English is the default. Settings offers Traditional Chinese and Spanish; language
-preference is local and does not restart the radio or serial session. Native Windows
+English is the default. Settings offers Spanish, French, Traditional Chinese and
+Arabic, plus Light, Dark and System appearance. Both preferences are local and
+do not restart the radio or serial session. Arabic includes RTL layout and
+isolated technical values; see [languages and appearance](../docs/localization-and-appearance.md). Native Windows
 file dialogs follow the Windows display language.
 
 Curated local events are logged under the app log directory as `session.jsonl`,

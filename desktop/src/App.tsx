@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Activity,
   Info,
@@ -9,6 +9,9 @@ import {
   File,
   FolderOpen,
   Globe2,
+  Sun,
+  Moon,
+  Monitor,
   Laptop,
   LoaderCircle,
   Send,
@@ -23,15 +26,15 @@ import { DeviceDetails, BridgeDetails } from "./Details";
 import { Dialog } from "./Dialog";
 import { DiscoveryStage } from "./DiscoveryStage";
 import { BrowserAccess, permissionHelp } from "./BrowserAccess";
-import { readLanguage, translations, webTranslations } from "./i18n";
+import { locales, isLanguage, translations, webTranslations } from "./i18n";
 import {
   formatBytes,
   terminal,
-  type Language,
   type Page,
   type Peer,
   type SelectedFile,
 } from "./types";
+import { usePreferences } from "./usePreferences";
 import { useBridge } from "./useBridge";
 import {
   connectionBusy,
@@ -49,7 +52,8 @@ export function BridgeApp({
   bridge: ReturnType<typeof useBridge>;
 }) {
   const { snapshot } = bridge;
-  const [language, setLanguage] = useState<Language>(readLanguage);
+  const { language, setLanguage, theme, setTheme, resolvedTheme } =
+    usePreferences();
   const [page, setPage] = useState<Page>("share");
   const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
@@ -72,14 +76,6 @@ export function BridgeApp({
   );
   const error = bridge.error;
   const permissionHint = bridge.native ? null : permissionHelp(error, language);
-  useEffect(() => {
-    document.documentElement.lang = language;
-    try {
-      localStorage.setItem("airbridge.language.v1", language);
-    } catch {
-      /* Preference storage is optional. */
-    }
-  }, [language]);
   const inspectedPeer =
     typeof inspector === "object" && inspector
       ? (snapshot.peers.find((peer) => peer.mac === inspector.mac) ?? {
@@ -301,9 +297,11 @@ export function BridgeApp({
                         <span className="large-file">
                           <File size={32} strokeWidth={1.3} />
                         </span>
-                        <strong>{selectedFile.name}</strong>
+                        <strong>
+                          <bdi dir="auto">{selectedFile.name}</bdi>
+                        </strong>
                         <span className="muted">
-                          {formatBytes(selectedFile.bytes)}
+                          {formatBytes(selectedFile.bytes, language)}
                         </span>
                         <button
                           className="text-button"
@@ -354,9 +352,14 @@ export function BridgeApp({
                     onClick={() => void sendFile()}
                   >
                     <ArrowUpRight size={18} />
-                    {target
-                      ? `${copy.sendTo} ${target.name ?? copy.appleDevice}`
-                      : copy.send}
+                    {target ? (
+                      <>
+                        {copy.sendTo}{" "}
+                        <bdi dir="auto">{target.name ?? copy.appleDevice}</bdi>
+                      </>
+                    ) : (
+                      copy.send
+                    )}
                   </button>
                 </section>
                 <section className="receive-panel">
@@ -374,7 +377,11 @@ export function BridgeApp({
                   </div>
                   {!bridge.native ? (
                     <p className="browser-location">
-                      {snapshot.receive_directory || webCopy.noFolder}
+                      {snapshot.receive_directory ? (
+                        <bdi dir="auto">{snapshot.receive_directory}</bdi>
+                      ) : (
+                        webCopy.noFolder
+                      )}
                     </p>
                   ) : null}
                   <button
@@ -398,7 +405,7 @@ export function BridgeApp({
                   >
                     <FolderOpen size={16} />
                     {bridge.native ? copy.openFolder : copy.changeFolder}
-                    <ChevronRight size={14} />
+                    <ChevronRight className="directional-icon" size={14} />
                   </button>
                 </section>
               </div>
@@ -410,7 +417,7 @@ export function BridgeApp({
                     onClick={() => setPage("activity")}
                   >
                     {copy.allActivity}
-                    <ChevronRight size={14} />
+                    <ChevronRight className="directional-icon" size={14} />
                   </button>
                 </div>
                 {snapshot.transfers.length ? (
@@ -451,13 +458,55 @@ export function BridgeApp({
                   aria-label={copy.language}
                   value={language}
                   onChange={(event) =>
-                    setLanguage(event.target.value as Language)
+                    isLanguage(event.target.value) &&
+                    setLanguage(event.target.value)
                   }
                 >
-                  <option value="en">English</option>
-                  <option value="zh-Hant">繁體中文</option>
-                  <option value="es">Español</option>
+                  {locales.map((locale) => (
+                    <option key={locale.id} value={locale.id} lang={locale.id}>
+                      {locale.name}
+                    </option>
+                  ))}
                 </select>
+              </section>
+              <section className="setting-card appearance-card">
+                <span className="setting-icon">
+                  <Sun size={21} />
+                </span>
+                <div className="setting-copy">
+                  <h2 id="appearance-heading">{copy.appearance}</h2>
+                  <p>{copy.appearanceHelp}</p>
+                  <p className="theme-status" aria-live="polite">
+                    {theme === "system"
+                      ? resolvedTheme === "dark"
+                        ? copy.systemDark
+                        : copy.systemLight
+                      : copy[theme]}
+                  </p>
+                </div>
+                <div
+                  className="theme-choices"
+                  role="group"
+                  aria-labelledby="appearance-heading"
+                >
+                  {(
+                    [
+                      { id: "light", Icon: Sun },
+                      { id: "dark", Icon: Moon },
+                      { id: "system", Icon: Monitor },
+                    ] as const
+                  ).map(({ id, Icon }) => (
+                    <button
+                      type="button"
+                      key={id}
+                      aria-pressed={theme === id}
+                      onClick={() => setTheme(id)}
+                    >
+                      <Icon size={18} />
+                      <span>{copy[id]}</span>
+                    </button>
+                  ))}
+                </div>
               </section>
               <section className="setting-card folder-setting">
                 <div className="setting-icon">
@@ -466,7 +515,11 @@ export function BridgeApp({
                 <div className="setting-copy">
                   <h2>{copy.receiveFolder}</h2>
                   <p className="folder-path">
-                    {snapshot.receive_directory || webCopy.noFolder}
+                    {snapshot.receive_directory ? (
+                      <bdi dir="auto">{snapshot.receive_directory}</bdi>
+                    ) : (
+                      webCopy.noFolder
+                    )}
                   </p>
                   {ownsPort ? <p>{copy.disconnectFolder}</p> : null}
                   {!bridge.native ? <p>{copy.folderBrowserHint}</p> : null}

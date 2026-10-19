@@ -1,4 +1,6 @@
-import { terminal, type Transfer } from "./types";
+import { terminal, type Language, type Transfer } from "./types";
+import { fileCount } from "./i18n";
+import { numberLocale } from "./locales/registry";
 import type { Copy } from "./i18n";
 export type ActivityFilter = "all" | "send" | "receive" | "active";
 export function progressOf(t: Transfer): number | null {
@@ -11,10 +13,14 @@ export function progressOf(t: Transfer): number | null {
     return null;
   return Math.max(0, Math.min(100, (t.done / t.progress_total) * 100));
 }
-export function transferName(t: Transfer, copy: Copy): string {
+export function transferName(
+  t: Transfer,
+  copy: Copy,
+  language: Language = "en",
+): string {
   const count = t.file_count ?? t.files?.filter((f) => !f.metadata).length ?? 1;
   return count > 1
-    ? `${count} ${copy.filesLabel}`
+    ? fileCount(count, language)
     : t.name === "Incoming files"
       ? copy.incomingFiles
       : t.name;
@@ -51,7 +57,7 @@ export function timeLabel(
     !Number.isFinite(new Date(value).getTime())
   )
     return fallback;
-  return new Intl.DateTimeFormat(language, {
+  return new Intl.DateTimeFormat(numberLocale(language), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));

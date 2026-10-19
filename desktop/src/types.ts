@@ -1,4 +1,5 @@
-export type Language = "en" | "zh-Hant" | "es";
+import { numberLocale, type Language } from "./locales/registry";
+export type { Language } from "./locales/registry";
 export type Page = "share" | "activity" | "settings";
 export interface Peer {
   mac: string;
@@ -75,8 +76,13 @@ export function mergeSnapshot(current: Snapshot, next: Snapshot): Snapshot {
 }
 export const terminal = (state: string) =>
   ["completed", "failed", "cancelled", "uncertain"].includes(state);
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+export function formatBytes(bytes: number, language: Language = "en"): string {
+  const number = (value: number, digits: number) =>
+    new Intl.NumberFormat(numberLocale(language), {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(value);
+  if (bytes < 1024) return `${number(bytes, 0)} B`;
+  if (bytes < 1024 * 1024) return `${number(bytes / 1024, 1)} KiB`;
+  return `${number(bytes / (1024 * 1024), 1)} MiB`;
 }

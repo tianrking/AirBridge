@@ -1,12 +1,14 @@
+import { usePreferences } from "../src/usePreferences";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { DiscoveryStage } from "../src/DiscoveryStage";
 import { TransferRow } from "../src/components";
 import { motionStyle } from "../src/motion";
-import { translations } from "../src/i18n";
-import type { Language, Peer, Transfer } from "../src/types";
+import { isLanguage, locales, translations } from "../src/i18n";
+import type { Peer, Transfer } from "../src/types";
 import "../src/styles.css";
 import "../src/product.css";
+import "../src/theme.css";
 import "./motion.css";
 const demo = (last: string, name: string): Peer => ({
   mac: `02:00:00:00:00:${last}`,
@@ -24,7 +26,7 @@ function Preview() {
   const [peers, setPeers] = useState([mac, phone]);
   const [selected, setSelected] = useState<string | null>(mac.mac);
   const [connected, setConnected] = useState(true);
-  const [language, setLanguage] = useState<Language>("en");
+  const { language, setLanguage } = usePreferences();
   const [progress, setProgress] = useState<number | null>(null);
   const [phase, setPhase] = useState("sending");
   const [unknownProgress, setUnknownProgress] = useState(false);
@@ -162,11 +164,15 @@ function Preview() {
         <select
           aria-label="Preview language"
           value={language}
-          onChange={(e) => setLanguage(e.target.value as Language)}
+          onChange={(e) =>
+            isLanguage(e.target.value) && setLanguage(e.target.value)
+          }
         >
-          <option value="en">English</option>
-          <option value="zh-Hant">繁體中文</option>
-          <option value="es">Español</option>
+          {locales.map((locale) => (
+            <option key={locale.id} value={locale.id}>
+              {locale.name}
+            </option>
+          ))}
         </select>
       </div>
       <p className="preview-explanation">

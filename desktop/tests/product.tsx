@@ -1,13 +1,15 @@
+import { usePreferences } from "../src/usePreferences";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ActivityPanel } from "../src/ActivityPanel";
 import { TransferDetails } from "../src/components";
 import { DeviceDetails, BridgeDetails } from "../src/Details";
 import { DiscoveryStage } from "../src/DiscoveryStage";
-import { translations } from "../src/i18n";
-import type { Language, Peer, Snapshot, Transfer } from "../src/types";
+import { isLanguage, locales, translations } from "../src/i18n";
+import type { Peer, Snapshot, Transfer } from "../src/types";
 import "../src/styles.css";
 import "../src/product.css";
+import "../src/theme.css";
 import "./motion.css";
 const time = Date.now();
 const peer: Peer = {
@@ -106,7 +108,7 @@ const history: Transfer[] = [
   },
 ];
 function Preview() {
-  const [language, setLanguage] = useState<Language>("en");
+  const { language, setLanguage } = usePreferences();
   const [selected, setSelected] = useState<string | null>(peer.mac);
   const [view, setView] = useState<Peer | Transfer | "bridge" | null>(null);
   const [notice, setNotice] = useState("");
@@ -162,11 +164,15 @@ function Preview() {
         <select
           aria-label="Preview language"
           value={language}
-          onChange={(e) => setLanguage(e.target.value as Language)}
+          onChange={(e) =>
+            isLanguage(e.target.value) && setLanguage(e.target.value)
+          }
         >
-          <option value="en">English</option>
-          <option value="zh-Hant">繁體中文</option>
-          <option value="es">Español</option>
+          {locales.map((locale) => (
+            <option key={locale.id} value={locale.id}>
+              {locale.name}
+            </option>
+          ))}
         </select>
         <span role="status">{notice}</span>
       </div>

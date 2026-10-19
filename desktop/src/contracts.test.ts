@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { mergeSnapshot, terminal, type Snapshot } from "./types";
-import { readLanguage, translations } from "./i18n";
+import { locales, readLanguage, translations } from "./i18n";
 
 describe("desktop event ordering", () => {
   it("does not roll a completed transfer back when initial IPC arrives late", () => {
@@ -37,7 +37,7 @@ describe("language preference", () => {
     vi.unstubAllGlobals();
   });
   it("restores supported languages and includes every visible string", () => {
-    for (const language of ["en", "zh-Hant", "es"] as const) {
+    for (const { id: language } of locales) {
       vi.stubGlobal("localStorage", { getItem: () => language });
       expect(readLanguage()).toBe(language);
       expect(Object.keys(translations[language]).sort()).toEqual(

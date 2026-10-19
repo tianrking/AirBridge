@@ -1,5 +1,5 @@
 body {
-  background: #f2f5f9;
+  background: var(--canvas);
 }
 .motion-preview {
   max-width: 1020px;
