@@ -2,6 +2,8 @@
 
 # AirBridge
 
+**[Open AirBridge Web ↗](https://w0x7ce.eu/AirBridge/)** · Desktop Chrome / Edge · [Browser & permissions guide](docs/pages.md)
+
 [![CI](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml)
 
 CI runs on every push and pull request; [version-tag releases require the same checks](docs/continuous-delivery.md).

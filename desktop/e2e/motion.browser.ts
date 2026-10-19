@@ -14,7 +14,7 @@ test("waves propagate, pause, follow transfer state and stop on disconnect", asy
     .poll(() => wave.evaluate((el) => getComputedStyle(el).transform))
     .not.toBe(original);
   await page
-    .getByRole("button", { name: "Pause signal animation", exact: true })
+    .getByRole("button", { name: "Pause animations", exact: true })
     .click();
   await expect(stage).toHaveAttribute("data-motion", "paused");
   await expect(wave).toHaveCSS("animation-play-state", "paused");
@@ -24,7 +24,7 @@ test("waves propagate, pause, follow transfer state and stop on disconnect", asy
     paused,
   );
   await page
-    .getByRole("button", { name: "Resume signal animation", exact: true })
+    .getByRole("button", { name: "Resume animations", exact: true })
     .click();
   await expect(wave).toHaveCSS("animation-play-state", "running");
   await page.getByRole("button", { name: "Toggle transfer ring" }).click();
@@ -38,8 +38,8 @@ test("waves propagate, pause, follow transfer state and stop on disconnect", asy
   await expect(page.locator(".signal-waves")).toBeHidden();
   await expect(page.locator(".peer-card:not(:disabled)")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Pause signal animation", exact: true }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: "Pause animations", exact: true }),
+  ).toBeEnabled();
 });
 
 test("background visibility pauses decorative waves without changing connection", async ({
@@ -71,7 +71,7 @@ test("background visibility pauses decorative waves without changing connection"
   });
   await expect(stage).toHaveAttribute("data-motion", "running");
   await page
-    .getByRole("button", { name: "Pause signal animation", exact: true })
+    .getByRole("button", { name: "Pause animations", exact: true })
     .click();
   await page.evaluate(() =>
     document.dispatchEvent(new Event("visibilitychange")),
@@ -99,7 +99,7 @@ test("reduced motion is honored on load and when changed, with keyboard control"
     .toBe(0);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const pause = page.getByRole("button", {
-    name: "Pause signal animation",
+    name: "Pause animations",
     exact: true,
   });
   await expect(pause).toBeEnabled();
@@ -108,11 +108,11 @@ test("reduced motion is honored on load and when changed, with keyboard control"
   await expect(stage).toHaveAttribute("data-motion", "paused");
   await page.getByLabel("Preview language").selectOption("zh-Hant");
   await expect(
-    page.getByRole("button", { name: "繼續訊號動畫" }),
+    page.getByRole("button", { name: "繼續動態效果" }),
   ).toBeVisible();
   await page.getByLabel("Preview language").selectOption("es");
   await expect(
-    page.getByRole("button", { name: "Reanudar animación de señal" }),
+    page.getByRole("button", { name: "Reanudar animaciones" }),
   ).toBeVisible();
 });
 

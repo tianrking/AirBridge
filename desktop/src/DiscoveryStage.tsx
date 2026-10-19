@@ -162,7 +162,7 @@ export function DiscoveryStage({
             aria-label={motionLabel}
             title={motionLabel}
             aria-pressed={motionPaused || reduced}
-            disabled={!connected || reduced}
+            disabled={reduced}
             onClick={() => setMotionPaused((previous) => !previous)}
           >
             {motionPaused || reduced ? <Play size={13} /> : <Pause size={13} />}
@@ -170,6 +170,10 @@ export function DiscoveryStage({
         </div>
       </div>
       <div className="discovery-space">
+        <div className="ambient-field" aria-hidden="true">
+          <span />
+          <span />
+        </div>
         <div className="discovery-rings" aria-hidden="true">
           <span />
           <span />

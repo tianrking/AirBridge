@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   Cable,
   ChevronRight,
-  CircleHelp,
   File,
   FolderOpen,
   Globe2,
@@ -23,6 +22,7 @@ import { ActivityPanel } from "./ActivityPanel";
 import { DeviceDetails, BridgeDetails } from "./Details";
 import { Dialog } from "./Dialog";
 import { DiscoveryStage } from "./DiscoveryStage";
+import { BrowserAccess, permissionHelp } from "./BrowserAccess";
 import { readLanguage, translations, webTranslations } from "./i18n";
 import {
   formatBytes,
@@ -70,6 +70,7 @@ export function BridgeApp({
     (transfer) => transfer.id === detailId,
   );
   const error = bridge.error;
+  const permissionHint = bridge.native ? null : permissionHelp(error, language);
   useEffect(() => {
     document.documentElement.lang = language;
     try {
@@ -191,7 +192,13 @@ export function BridgeApp({
             <div className="error-banner" role="alert">
               <div>
                 <strong>{copy.error}</strong>
-                <p>{error}</p>
+                <p>{permissionHint ?? error}</p>
+                {permissionHint && (
+                  <details>
+                    <summary>{copy.details}</summary>
+                    <p>{error}</p>
+                  </details>
+                )}
               </div>
               <button
                 className="icon-button"
@@ -204,12 +211,9 @@ export function BridgeApp({
               </button>
             </div>
           ) : null}
-          {!bridge.native && (bridge.unsupported || page === "settings") ? (
-            <div className="preview-note">
-              <CircleHelp size={16} />
-              {bridge.unsupported ?? webCopy.help}
-            </div>
-          ) : null}
+          {!bridge.native && (!connected || page === "settings") && (
+            <BrowserAccess language={language} />
+          )}
           {page === "share" ? (
             <>
               <section className="bridge-strip">

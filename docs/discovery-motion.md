@@ -49,6 +49,11 @@ interaction evidence, not nearby-device discovery or AirDrop transfer evidence.*
 
 ## Propagating signal waves
 
+The production idle screen now also has default blue/lilac ambient drift and
+breathing concentric layers, without claiming radio activity. Its pause button
+is available before connection. See the [hosted product](pages.md); the motion
+is no longer limited to a connected bridge or a development preview.
+
 The current surface adds four staggered expanding waves, centered on the bridge
 glyph, with a 6.4-second cycle while connected and 4.8 seconds during an active
 transfer. These are **state illustrations**, not RSSI measurements, packet counts,

@@ -23,8 +23,8 @@ export const webTranslations: Record<
   },
 };
 const en = {
-  pauseSignal: "Pause signal animation",
-  resumeSignal: "Resume signal animation",
+  pauseSignal: "Pause animations",
+  resumeSignal: "Resume animations",
   motionReduced: "Animation reduced by system preference",
   disconnecting: "Disconnecting",
   recovering: "Releasing connection",
@@ -212,8 +212,8 @@ const en = {
 } as const;
 export type Copy = { [Key in keyof typeof en]: string };
 const zh: Copy = {
-  pauseSignal: "暫停訊號動畫",
-  resumeSignal: "繼續訊號動畫",
+  pauseSignal: "暫停動態效果",
+  resumeSignal: "繼續動態效果",
   motionReduced: "依系統偏好減少動態效果",
   disconnecting: "正在中斷",
   recovering: "正在釋放連線",
@@ -389,8 +389,8 @@ const zh: Copy = {
   receivingAuto: "開發韌體目前會自動接受已設定 Apple 對端的檔案。",
 };
 const es: Copy = {
-  pauseSignal: "Pausar animación de señal",
-  resumeSignal: "Reanudar animación de señal",
+  pauseSignal: "Pausar animaciones",
+  resumeSignal: "Reanudar animaciones",
   motionReduced: "Animación reducida según la preferencia del sistema",
   disconnecting: "Desconectando",
   recovering: "Liberando conexión",

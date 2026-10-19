@@ -47,15 +47,53 @@ export type BrowserPlatform = Window & {
   }) => Promise<DiskDirectory>;
   showOpenFilePicker?: (options: { multiple: false }) => Promise<DiskFile[]>;
 };
-export function supportIssue(): string | null {
-  if (!window.isSecureContext)
-    return "Open AirBridge over HTTPS or localhost to use Web Serial.";
-  if (!(navigator as Navigator & { serial?: SerialAPI }).serial)
-    return "Web Serial is unavailable. Use desktop Chrome or Edge.";
-  if (
-    !(window as BrowserPlatform).showDirectoryPicker ||
-    !(window as BrowserPlatform).showOpenFilePicker
-  )
-    return "This browser cannot safely save received files. Use desktop Chrome or Edge with file-system access enabled.";
+export type SupportCode =
+  "insecure" | "embedded" | "policy" | "serial" | "storage";
+export function supportCode(features: {
+  secure: boolean;
+  embedded: boolean;
+  policy: boolean;
+  serial: boolean;
+  storage: boolean;
+}): SupportCode | null {
+  if (!features.secure) return "insecure";
+  if (features.embedded) return "embedded";
+  if (!features.policy) return "policy";
+  if (!features.serial) return "serial";
+  if (!features.storage) return "storage";
   return null;
+}
+export function browserSupport(): SupportCode | null {
+  const doc =
+    typeof document === "undefined"
+      ? undefined
+      : (document as Document & {
+          permissionsPolicy?: { allowsFeature(name: string): boolean };
+          featurePolicy?: { allowsFeature(name: string): boolean };
+        });
+  const policy = doc?.permissionsPolicy ?? doc?.featurePolicy;
+  return supportCode({
+    secure: !!window.isSecureContext,
+    embedded: window.self !== window.top,
+    policy: policy?.allowsFeature("serial") ?? true,
+    serial: !!(navigator as Navigator & { serial?: SerialAPI }).serial,
+    storage: !!(
+      (window as BrowserPlatform).showDirectoryPicker &&
+      (window as BrowserPlatform).showOpenFilePicker
+    ),
+  });
+}
+const issues: Record<SupportCode, string> = {
+  insecure: "Open AirBridge over HTTPS or localhost to use Web Serial.",
+  embedded:
+    "Open AirBridge directly in a desktop Chrome or Edge tab, outside the embedded preview.",
+  policy:
+    "Serial access is blocked by this page or browser policy. Open the full page or contact your browser administrator.",
+  serial: "Web Serial is unavailable. Use desktop Chrome or Edge.",
+  storage:
+    "This browser cannot safely save received files. Use desktop Chrome or Edge with file-system access enabled.",
+};
+export function supportIssue(): string | null {
+  const code = browserSupport();
+  return code ? issues[code] : null;
 }

@@ -1,5 +1,10 @@
 # AirBridge Web
 
+Open the hosted **[HTTPS application](https://w0x7ce.eu/AirBridge/)** in desktop
+Chrome or Edge. See [deployment and permissions](../docs/pages.md). Tauri remains
+available in this same project. The production UI now has ambient motion by
+default before connecting; reduced-motion and manual pause are respected.
+
 ![Actual English browser interface, disconnected](../docs/images/web-en-disconnected.png)
 
 *Actual Chrome capture with no hardware connected; no simulated peers or transfers.*
@@ -55,7 +60,8 @@ picker receive an explicit unsupported message. The interface remains navigable.
    or Settings) and grant read/write access to
    an appropriate receive directory. The folder is selected for this page session;
    no implicit Downloads write or persisted permission is assumed.
-5. Click **Connect bridge**, then select the verified COM4 in the browser chooser.
+5. Click **Connect bridge**, then select the verified bridge in the browser chooser.
+   Web Serial does not expose COM numbers; correlate COM4 in Device Manager.
    The filter selects Espressif USB Serial/JTAG (`303a:1001`); HELLO must then
    identify factory MAC `f0:9e:9e:1e:61:3c`. Only after this check are incoming
    records accepted or transfer commands enabled. DTR/RTS are explicitly false.

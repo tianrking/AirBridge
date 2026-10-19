@@ -2,6 +2,8 @@
 
 # AirBridge
 
+**[Abrir AirBridge Web ↗](https://w0x7ce.eu/AirBridge/)** · Chrome / Edge de escritorio · [Guía de navegador y permisos](docs/pages.md)
+
 [![CI](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml)
 
 Cada push y PR ejecuta las pruebas; [las versiones etiquetadas requieren los mismos controles](docs/continuous-delivery.md).

@@ -57,6 +57,11 @@ release qualification remain separate. Owners can still publish manually outside
 Actions; repository-wide branch/tag protections are separate GitHub settings.
 No release is created merely by pushing an ordinary commit.
 
+Successful ordinary `main` commits now update [GitHub Pages](pages.md) after the
+same complete quality gate. PRs and other refs cannot deploy. The Pages job uses
+the exact tested artifact, verifies the current main SHA and publishes a public
+source/asset-hash manifest. Version-tag ZIP releases remain a separate workflow.
+
 ## Reproduce locally without hardware
 
 ```sh

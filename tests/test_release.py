@@ -39,6 +39,21 @@ class ReleasePolicy(unittest.TestCase):
         self.assertEqual(release['permissions'], {'contents': 'read'})
         self.assertEqual(release['jobs']['publish']['permissions'], {'contents': 'write'})
 
+    def test_pages_only_deploys_tested_main_artifact_with_narrow_permissions(self):
+        ci = self.workflow('ci.yml')
+        jobs = ci['jobs']
+        self.assertEqual(jobs['pages-artifact']['needs'], 'checks')
+        self.assertEqual(jobs['deploy-pages']['needs'], ['checks', 'pages-artifact'])
+        guard = "github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')"
+        for name in ('pages-artifact', 'deploy-pages'):
+            self.assertEqual(jobs[name]['if'], guard)
+            self.assertNotIn('always()', jobs[name]['if'])
+        self.assertEqual(jobs['deploy-pages']['permissions'], {'contents': 'read', 'pages': 'write', 'id-token': 'write'})
+        artifact_steps = jobs['pages-artifact']['steps']
+        self.assertTrue(any(s.get('with', {}).get('name') == 'tested-web' for s in artifact_steps))
+        self.assertFalse(any('npm run build' in s.get('run', '') for s in artifact_steps))
+        self.assertIn('git/ref/heads/main', jobs['deploy-pages']['steps'][0]['run'])
+
     def test_gate_rejects_failed_cancelled_skipped_and_missing_results(self):
         quality = self.workflow('quality.yml')
         gate = quality['jobs']['quality-gate']
