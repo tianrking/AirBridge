@@ -8,7 +8,8 @@ import {
   type Event,
 } from "./protocol";
 import type { DiskDirectory, SerialPort } from "./platform";
-import { Receiver } from "./receiver";
+import { Receiver, receiveEvents } from "./receiver";
+export const RECEIVE_IDLE_MS = 60000;
 type Waiter = {
   resolve: (e: Event) => void;
   reject: (error: Error) => void;
@@ -30,6 +31,11 @@ export class Session {
   private waiting = new Set<{ test: (e: Event) => boolean; waiter: Waiter }>();
   private closing = false;
   private closed?: Promise<void>;
+  private portOpening?: Promise<void>;
+  private opened = false;
+  private started = false;
+  private faulted = false;
+  private receiveTimer?: ReturnType<typeof setTimeout>;
   constructor(
     private port: SerialPort,
     directory: DiskDirectory,
@@ -39,21 +45,27 @@ export class Session {
     this.receiver = new Receiver(directory, emit);
   }
   async open() {
-    const info = this.port.getInfo();
-    check(
-      info.usbVendorId === 0x303a && info.usbProductId === 0x1001,
-      "Select the ESP32-S3 native USB Serial/JTAG port",
-    );
-    await this.port.open({
-      baudRate: 115200,
-      bufferSize: 65536,
-      flowControl: "none",
-    });
+    check(!this.started && !this.closing, "Session cannot be reopened");
+    this.started = true;
     try {
+      const info = this.port.getInfo();
+      check(
+        info.usbVendorId === 0x303a && info.usbProductId === 0x1001,
+        "Select the ESP32-S3 native USB Serial/JTAG port",
+      );
+      this.portOpening = this.port.open({
+        baudRate: 115200,
+        bufferSize: 65536,
+        flowControl: "none",
+      });
+      await this.portOpening;
+      this.opened = true;
+      check(!this.closing, "Session closed during port opening");
       await this.port.setSignals({
         dataTerminalReady: false,
         requestToSend: false,
       });
+      check(!this.closing, "Session closed during signal configuration");
       check(
         this.port.readable && this.port.writable,
         "Serial streams unavailable",
@@ -81,10 +93,15 @@ export class Session {
           hello.hardware_id.toLowerCase() === BOARD_ID,
         "Board identity missing or different. Use the verified replacement COM4 and firmware with hardware_id support",
       );
+      check(!this.closing, "Session closed during handshake");
       this.capabilities = hello;
       return hello;
     } catch (e) {
-      await this.close();
+      try {
+        await this.close();
+      } catch {
+        /* The owner retains a failed-close session for explicit recovery. */
+      }
       throw e;
     }
   }
@@ -96,9 +113,14 @@ export class Session {
       await this.writer.write(bytes);
     });
     this.writeTail = task;
+    void task.catch((error) => this.fault(error));
     return task;
   }
   request(body: string) {
+    check(
+      this.capabilities && !this.closing,
+      "Serial session is not connected",
+    );
     return this.requestBody(`${this.nonce} ${body}`);
   }
   private requestBody(body: string): Promise<Event> {
@@ -113,8 +135,7 @@ export class Session {
             "Serial acknowledgement timed out; result uncertain. No automatic resend",
           );
           reject(error);
-          this.fail(error);
-          void this.close().catch(() => {});
+          this.fault(error);
         }, 5000);
         this.pending.set(sequence, { resolve, reject, timer });
         void this.write(bytes).catch((error) => {
@@ -128,6 +149,13 @@ export class Session {
     return task;
   }
   watch(test: (e: Event) => boolean, timeout: number) {
+    if (this.closing) {
+      const promise = Promise.reject<Event>(
+        new Error("Serial session closed; incomplete result uncertain"),
+      );
+      void promise.catch(() => {});
+      return { promise, dispose: () => {} };
+    }
     let dispose = () => {};
     const promise = new Promise<Event>((resolve, reject) => {
       const item = {
@@ -183,8 +211,35 @@ export class Session {
               );
             // Native reception must not publish unverified-device output during HELLO.
             if (!this.capabilities) continue;
+            if (receiveEvents.has(e.event)) {
+              clearTimeout(this.receiveTimer);
+              this.receiveTimer = setTimeout(
+                () =>
+                  this.fault(
+                    new Error(
+                      "Receive storage or progress timed out; no completion confirmed",
+                    ),
+                  ),
+                RECEIVE_IDLE_MS,
+              );
+            }
             const ack = await this.receiver.handle(e);
+            if (this.closing) break;
             if (ack) await this.write(ack);
+            if (this.closing) break;
+            if (receiveEvents.has(e.event)) {
+              clearTimeout(this.receiveTimer);
+              if (this.receiver.active)
+                this.receiveTimer = setTimeout(
+                  () =>
+                    this.fault(
+                      new Error(
+                        "Receive progress timed out; no completion confirmed",
+                      ),
+                    ),
+                  RECEIVE_IDLE_MS,
+                );
+            }
             this.emit(e);
             for (const item of [...this.waiting])
               if (item.test(e)) {
@@ -201,43 +256,61 @@ export class Session {
         );
     } catch (error) {
       if (!this.closing) {
-        this.fail(error instanceof Error ? error : new Error(String(error)));
-        // Avoid awaiting close() from the reader that close() waits for.
-        void this.close().catch(() => {});
+        this.fault(error);
       }
     } finally {
       this.reader?.releaseLock();
       this.reader = undefined;
     }
   }
+  private fault(reason: unknown) {
+    if (this.closing || this.faulted) return;
+    this.faulted = true;
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    this.receiver.interrupt(error.message);
+    this.fail(error);
+    // Never await the reader's own shutdown from inside readLoop.
+    void this.close().catch(() => {});
+  }
   close(): Promise<void> {
     if (this.closed) return this.closed;
     this.closing = true;
-    this.closed = (async () => {
-      const error = new Error(
-        "Serial session closed; incomplete result uncertain",
-      );
-      for (const w of this.pending.values()) {
-        clearTimeout(w.timer);
-        w.reject(error);
-      }
-      for (const { waiter: w } of this.waiting) {
-        clearTimeout(w.timer);
-        w.reject(error);
-      }
-      this.pending.clear();
-      this.waiting.clear();
-      // Interrupt a blocked ACK write before waiting for its reader task.
+    clearTimeout(this.receiveTimer);
+    const error = new Error(
+      "Serial session closed; incomplete result uncertain",
+    );
+    this.receiver.interrupt(error.message);
+    for (const w of this.pending.values()) {
+      clearTimeout(w.timer);
+      w.reject(error);
+    }
+    for (const { waiter: w } of this.waiting) {
+      clearTimeout(w.timer);
+      w.reject(error);
+    }
+    this.pending.clear();
+    this.waiting.clear();
+    const task = (async () => {
+      // A disconnect during open must wait for actual ownership before closing.
+      await this.portOpening?.catch(() => {});
+      const stopped = this.receiver.stop();
       const aborted = this.writer?.abort().catch(() => {});
       await this.reader?.cancel().catch(() => {});
       await this.readTask;
-      await this.receiver.stop();
+      await stopped;
       await aborted;
       await this.writeTail.catch(() => {});
       this.writer?.releaseLock();
       this.writer = undefined;
-      await this.port.close();
+      if (this.opened) {
+        await this.port.close();
+        this.opened = false;
+      }
     })();
-    return this.closed;
+    this.closed = task;
+    void task.catch(() => {
+      if (this.closed === task) this.closed = undefined;
+    });
+    return task;
   }
 }

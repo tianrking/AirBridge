@@ -3,6 +3,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { mergeSnapshot, type Snapshot } from "./types";
 import { webBridge } from "./web/bridge";
+import { ownsConnection } from "./presentation";
 import { supportIssue } from "./web/platform";
 const initial: Snapshot = {
   can_resolve: false,
@@ -23,7 +24,7 @@ export function useBridge() {
   const native = isTauri();
   const unsupported = native ? null : supportIssue();
   useEffect(() => {
-    if (native || snapshot.connection !== "connected") return;
+    if (native || !ownsConnection(snapshot.connection)) return;
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";

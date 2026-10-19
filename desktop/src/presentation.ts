@@ -55,3 +55,19 @@ export function timeLabel(
     timeStyle: "short",
   }).format(new Date(value));
 }
+
+export const connectionBusy = (state: string) =>
+  ["connecting", "disconnecting", "recovering"].includes(state);
+export const ownsConnection = (state: string) =>
+  connectionBusy(state) || state === "connected" || state === "cleanup_failed";
+export function connectionLabel(state: string, copy: Copy): string {
+  return [
+    "connecting",
+    "disconnecting",
+    "recovering",
+    "cleanup_failed",
+    "connected",
+  ].includes(state)
+    ? copy[state as keyof Copy]
+    : copy.disconnected;
+}

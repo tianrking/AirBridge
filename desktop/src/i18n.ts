@@ -23,6 +23,12 @@ export const webTranslations: Record<
   },
 };
 const en = {
+  disconnecting: "Disconnecting",
+  recovering: "Releasing connection",
+  cleanup_failed: "Port release unconfirmed",
+  retryRelease: "Retry disconnect",
+  releaseHint:
+    "Finish releasing the previous serial connection before reconnecting.",
   inProgress: "In progress",
   sender: "Sender",
   viewDetails: "View details",
@@ -202,6 +208,11 @@ const en = {
 } as const;
 export type Copy = { [Key in keyof typeof en]: string };
 const zh: Copy = {
+  disconnecting: "正在中斷",
+  recovering: "正在釋放連線",
+  cleanup_failed: "尚未確認序列埠已釋放",
+  retryRelease: "重試中斷連線",
+  releaseHint: "重新連線前，必須先完成釋放上一個序列埠連線。",
   inProgress: "進行中",
   sender: "傳送者",
   viewDetails: "查看詳情",
@@ -371,6 +382,12 @@ const zh: Copy = {
   receivingAuto: "開發韌體目前會自動接受已設定 Apple 對端的檔案。",
 };
 const es: Copy = {
+  disconnecting: "Desconectando",
+  recovering: "Liberando conexión",
+  cleanup_failed: "Liberación del puerto sin confirmar",
+  retryRelease: "Reintentar desconexión",
+  releaseHint:
+    "Finaliza la liberación de la conexión serie anterior antes de volver a conectar.",
   inProgress: "En curso",
   sender: "Remitente",
   viewDetails: "Ver detalles",

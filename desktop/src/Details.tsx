@@ -9,7 +9,7 @@ import {
 import { Dialog } from "./Dialog";
 import type { Copy } from "./i18n";
 import { formatBytes, type Language, type Peer, type Snapshot } from "./types";
-import { timeLabel } from "./presentation";
+import { timeLabel, connectionLabel } from "./presentation";
 export function CopyValue({ value, copy }: { value: string; copy: Copy }) {
   const [state, setState] = useState<"idle" | "done" | "error">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -192,9 +192,7 @@ export function BridgeDetails({
       <p
         className={`status-pill ${snapshot.connection === "connected" ? "is-available" : "is-muted"}`}
       >
-        {snapshot.connection === "connected"
-          ? copy.connected
-          : copy.disconnected}
+        {connectionLabel(snapshot.connection, copy)}
       </p>
       <p className="dialog-description">{copy.identitySource}</p>
       <dl className="detail-list">

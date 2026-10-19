@@ -31,8 +31,19 @@ type Job = {
   complete: boolean;
   failed: boolean;
 };
+export const receiveEvents = new Set([
+  "transfer_begin",
+  "manifest_file",
+  "file_begin",
+  "file_chunk",
+  "file_end",
+  "transfer_ready",
+  "transfer_complete",
+]);
 export class Receiver {
   private job?: Job;
+  private closed = false;
+  private phase = "offer";
   constructor(
     private root: DiskDirectory,
     private emit: (e: Event) => void,
@@ -40,14 +51,48 @@ export class Receiver {
   get active() {
     return !!this.job && !this.job.complete && !this.job.failed;
   }
+  interrupt(message: string, uncertain = true) {
+    const job = this.job;
+    if (!job || job.complete || job.failed) return;
+    job.failed = true;
+    this.emit({
+      event: "incoming_failed",
+      transfer_id: job.id,
+      bytes: job.total,
+      files: job.count,
+      directory: `${this.root.name}/${job.directory.name}`,
+      message,
+      phase: this.phase,
+      uncertain,
+    });
+  }
   async stop() {
-    if (!this.job) return;
-    this.job.failed = !this.job.complete;
-    for (const part of this.job.parts.values())
-      if (part.stream) {
-        await part.stream.abort().catch(() => {});
+    this.closed = true;
+    this.interrupt("Receive interrupted; incomplete files were not confirmed");
+    await Promise.allSettled(
+      [...(this.job?.parts.values() ?? [])].map(async (part) => {
+        const stream = part.stream;
         part.stream = undefined;
-      }
+        if (stream) await stream.abort();
+      }),
+    );
+  }
+  private alive() {
+    check(!this.closed && this.active, "Receive job is stopped or failed");
+  }
+  private async verifyFiles() {
+    this.alive();
+    for (const part of this.job!.parts.values()) {
+      check(part.sha256 && !part.stream, "File verification incomplete");
+      const file = await part.handle.getFile();
+      check(
+        file.size === part.size &&
+          (await sha256(new Uint8Array(await file.arrayBuffer()))) ===
+            part.sha256,
+        "Saved file SHA256 or size changed; completion withheld",
+      );
+      this.alive();
+    }
   }
   private async receipt(status: string) {
     const job = this.job!;
@@ -63,14 +108,25 @@ export class Receiver {
         sha256: f.sha256 ?? null,
       })),
     };
-    const output = await (
-      await job.directory.getFileHandle("airbridge-receipt.json", {
-        create: true,
-      })
-    ).createWritable();
+    this.alive();
+    const handle = await job.directory.getFileHandle("airbridge-receipt.json", {
+      create: true,
+    });
+    this.alive();
+    const output = await handle.createWritable();
+    const payload = JSON.stringify(record, null, 2);
     try {
-      await output.write(JSON.stringify(record, null, 2));
+      this.alive();
+      await output.write(payload);
+      this.alive();
       await output.close();
+      this.alive();
+      const saved = await handle.getFile();
+      check(
+        (await saved.text()) === payload,
+        "Saved receipt readback differs; completion withheld",
+      );
+      this.alive();
     } catch (e) {
       await output.abort().catch(() => {});
       throw e;
@@ -78,6 +134,23 @@ export class Receiver {
     return record;
   }
   async handle(e: Event): Promise<string | undefined> {
+    if (!receiveEvents.has(e.event)) return;
+    check(
+      !this.closed && !this.job?.failed,
+      "Receive job is stopped or failed",
+    );
+    this.phase = e.event;
+    try {
+      return await this.process(e);
+    } catch (error) {
+      this.interrupt(
+        error instanceof Error ? error.message : String(error),
+        this.job?.committed === true,
+      );
+      throw error;
+    }
+  }
+  private async process(e: Event): Promise<string | undefined> {
     if (e.event === "transfer_begin") {
       check(!this.active, "Previous incoming transfer is unresolved");
       const id = text(e, "transfer_id"),
@@ -102,6 +175,7 @@ export class Receiver {
       const directory = await this.root.getDirectoryHandle(name, {
         create: true,
       });
+      check(!this.closed, "Receiver stopped during directory creation");
       this.job = {
         id,
         count,
@@ -113,7 +187,6 @@ export class Receiver {
         complete: false,
         failed: false,
       };
-      await this.receipt("receiving");
       this.emit({
         event: "incoming_started",
         transfer_id: id,
@@ -121,6 +194,7 @@ export class Receiver {
         files: count,
         directory: `${this.root.name}/${name}`,
       });
+      await this.receipt("receiving");
       return;
     }
     if (
@@ -205,7 +279,12 @@ export class Receiver {
         const handle = await job.directory.getFileHandle(name, {
           create: true,
         });
+        this.alive();
         const stream = await handle.createWritable();
+        if (this.closed || job.failed) {
+          await stream.abort();
+          this.alive();
+        }
         job.parts.set(index, {
           name,
           size,
@@ -231,6 +310,7 @@ export class Receiver {
           "Chunk offset or length mismatch",
         );
         await part.stream.write(data);
+        this.alive();
         part.offset += data.length;
         if (
           !part.metadata &&
@@ -266,6 +346,7 @@ export class Receiver {
               expected,
           "Saved file SHA256 or size mismatch; commit withheld",
         );
+        this.alive();
         part.sha256 = expected;
         break;
       }
@@ -282,6 +363,7 @@ export class Receiver {
               [...job.parts.values()].reduce((n, f) => n + f.size, 0),
           "Cannot commit incomplete transfer",
         );
+        await this.verifyFiles();
         await this.receipt("files_verified");
         job.committed = true;
         this.emit({ event: "incoming_verifying", transfer_id: job.id });
@@ -294,6 +376,7 @@ export class Receiver {
             e.response_written === true,
           "Native receiver did not confirm delivery",
         );
+        await this.verifyFiles();
         const record = await this.receipt("completed");
         job.complete = true;
         this.emit({

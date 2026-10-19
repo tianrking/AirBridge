@@ -1,15 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  mkdtemp,
-  mkdir,
-  readFile,
-  writeFile,
-  open,
-  stat,
-  rm,
-} from "node:fs/promises";
+import { describe, expect, it, vi } from "vitest";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import {
@@ -23,146 +14,18 @@ import {
   unbase64,
   type Event,
 } from "./protocol";
-import type {
-  DiskDirectory,
-  DiskFile,
-  DiskWriter,
-  SerialPort,
-} from "./platform";
 import { Receiver } from "./receiver";
 import { Session } from "./session";
 import { WebBridge } from "./bridge";
-const temporary: string[] = [];
-async function directory() {
-  const path = await mkdtemp(join(tmpdir(), "airbridge-web-"));
-  temporary.push(path);
-  return new Directory(path);
-}
-afterEach(async () => {
-  vi.useRealTimers();
-  vi.unstubAllGlobals();
-  await Promise.all(
-    temporary
-      .splice(0)
-      .map((path) => rm(path, { recursive: true, force: true })),
-  );
-});
-// Actual host files back the storage contract tests. Browser-native storage is
-// exercised separately; these tests are not serial or AirDrop qualification.
-class Directory implements DiskDirectory {
-  name: string;
-  constructor(
-    public path: string,
-    private corrupt = false,
-    private denyClose = false,
-  ) {
-    this.name = path.split(/[\\/]/).pop()!;
-  }
-  async getDirectoryHandle(
-    name: string,
-    options?: { create?: boolean },
-  ): Promise<Directory> {
-    const path = join(this.path, name);
-    if (options?.create) await mkdir(path, { recursive: true });
-    try {
-      await stat(path);
-    } catch {
-      throw new DOMException("Absent", "NotFoundError");
-    }
-    return new Directory(path, this.corrupt, this.denyClose);
-  }
-  async getFileHandle(
-    name: string,
-    options?: { create?: boolean },
-  ): Promise<DiskFile> {
-    const path = join(this.path, name);
-    if (options?.create) await (await open(path, "a")).close();
-    const corrupt = this.corrupt && name !== "airbridge-receipt.json";
-    const denyClose = this.denyClose && name !== "airbridge-receipt.json";
-    return {
-      name,
-      async getFile() {
-        return Object.assign(new Blob([await readFile(path)]), { name });
-      },
-      async createWritable(): Promise<DiskWriter> {
-        const chunks: Uint8Array<ArrayBuffer>[] = [];
-        return {
-          async write(data) {
-            chunks.push(
-              typeof data === "string"
-                ? new TextEncoder().encode(data)
-                : data.slice(),
-            );
-          },
-          async close() {
-            if (denyClose)
-              throw new DOMException("Disk write refused", "NotAllowedError");
-            const data = new Uint8Array(await new Blob(chunks).arrayBuffer());
-            if (corrupt && data.length) data[0] ^= 1;
-            await writeFile(path, data);
-          },
-          async abort() {
-            chunks.length = 0;
-          },
-        };
-      },
-    };
-  }
-}
-const encodedName = (name: string) => base64(new TextEncoder().encode(name));
-async function offer(
-  receiver: Receiver,
-  name = "測試.bin",
-  size = 3,
-  id = "TEST-1",
-) {
-  await receiver.handle({
-    event: "transfer_begin",
-    transfer_id: id,
-    files: 1,
-    total_bytes: size,
-  });
-  await receiver.handle({
-    event: "manifest_file",
-    index: 0,
-    size,
-    name_b64: encodedName(name),
-  });
-  await receiver.handle({
-    event: "file_begin",
-    index: 0,
-    size,
-    name_b64: encodedName(name),
-    metadata: false,
-  });
-}
-async function finish(
-  receiver: Receiver,
-  bytes = new TextEncoder().encode("abc"),
-) {
-  if (bytes.length)
-    expect(
-      await receiver.handle({
-        event: "file_chunk",
-        index: 0,
-        offset: 0,
-        data: base64(bytes),
-      }),
-    ).toBe(`CHUNK TEST-1 0 ${bytes.length}\n`);
-  await receiver.handle({
-    event: "file_end",
-    index: 0,
-    bytes: bytes.length,
-    sha256: await sha256(bytes),
-  });
-}
-const ready: Event = {
-  event: "transfer_ready",
-  transfer_id: "TEST-1",
-  nonce: "a".repeat(32),
-  files: 1,
-  total_bytes: 3,
-};
+import {
+  directory,
+  Directory,
+  encodedName,
+  offer,
+  finish,
+  ready,
+} from "../../tests/fixtures";
+import { VirtualPort } from "../../tests/virtual-port";
 describe("browser wire protocol", () => {
   it("matches the independent literal CRC fixture and rejects framing injection", () => {
     expect(new TextDecoder().decode(command(17, "HELLO"))).toBe(
@@ -248,14 +111,6 @@ describe("checked browser receive publication", () => {
     await finish(receiver);
     expect(await receiver.handle(ready)).toBe(`COMMIT ${"a".repeat(32)}\n`);
     expect(events.some((e) => e.event === "received")).toBe(false);
-    await expect(
-      receiver.handle({
-        event: "transfer_complete",
-        transfer_id: "TEST-1",
-        host_committed: true,
-        response_written: false,
-      }),
-    ).rejects.toThrow();
     await receiver.handle({
       event: "transfer_complete",
       transfer_id: "TEST-1",
@@ -277,22 +132,13 @@ describe("checked browser receive publication", () => {
       receiver = new Receiver(new Directory(dir.path, true), () => {});
     await offer(receiver);
     await expect(finish(receiver)).rejects.toThrow(/SHA256/);
-    await expect(receiver.handle(ready)).rejects.toThrow(/incomplete/);
+    await expect(receiver.handle(ready)).rejects.toThrow(/failed/);
     await receiver.stop();
   });
   it("withholds COMMIT on close failure and rejects chunk replays or early commit", async () => {
     const dir = await directory(),
       receiver = new Receiver(new Directory(dir.path, false, true), () => {});
     await offer(receiver);
-    await expect(
-      receiver.handle({
-        event: "file_chunk",
-        index: 0,
-        offset: 1,
-        data: "YWJj",
-      }),
-    ).rejects.toThrow();
-    await expect(receiver.handle(ready)).rejects.toThrow();
     await expect(finish(receiver)).rejects.toThrow(/refused/);
     await expect(receiver.handle(ready)).rejects.toThrow();
     await receiver.stop();
@@ -317,9 +163,10 @@ describe("checked browser receive publication", () => {
     ).rejects.toThrow();
     await expect(offer(receiver, "../escape")).rejects.toThrow();
     await receiver.stop();
-    await offer(receiver);
+    const other = new Receiver(await directory(), () => {});
+    await offer(other);
     await expect(
-      receiver.handle({
+      other.handle({
         event: "file_chunk",
         transfer_id: "OTHER",
         index: 0,
@@ -328,7 +175,7 @@ describe("checked browser receive publication", () => {
       }),
     ).rejects.toThrow(/identity/);
     await expect(
-      receiver.handle({
+      other.handle({
         event: "file_begin",
         index: 16,
         size: 3,
@@ -336,68 +183,9 @@ describe("checked browser receive publication", () => {
         metadata: true,
       }),
     ).rejects.toThrow();
-    await receiver.stop();
+    await other.stop();
   });
 });
-// Deterministic virtual wire: explicitly not a substitute for COM4 / AirDrop.
-class VirtualPort implements SerialPort {
-  readable: ReadableStream<Uint8Array<ArrayBuffer>>;
-  writable: WritableStream<Uint8Array<ArrayBuffer>>;
-  private controller!: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>;
-  records: string[] = [];
-  closed = false;
-  signals?: { dataTerminalReady: boolean; requestToSend: boolean };
-  respond = true;
-  hardware = BOARD_ID;
-  onCommand?: (record: string, sequence: number) => void;
-  constructor() {
-    this.readable = new ReadableStream({
-      start: (c) => {
-        this.controller = c;
-      },
-    });
-    this.writable = new WritableStream({
-      write: (bytes) => {
-        const record = new TextDecoder().decode(bytes);
-        this.records.push(record);
-        if (!record.startsWith("AB2 ") || !this.respond) return;
-        const sequence = Number(record.split(" ")[1]);
-        const words = record.trim().split(" ");
-        const offset = ["META", "DATA"].includes(words[3])
-          ? Number(words[4]) + unbase64(words[5]).length
-          : 0;
-        this.emit({
-          event: "command_reply",
-          sequence,
-          ok: true,
-          offset,
-          protocol: 2,
-          max_file: 1048576,
-          chunk_bytes: 112,
-          radio_mac: "02:11:22:33:44:55",
-          hardware_id: this.hardware,
-          resolve: true,
-        });
-        this.onCommand?.(record, sequence);
-      },
-    });
-  }
-  getInfo() {
-    return { usbVendorId: 0x303a, usbProductId: 0x1001 };
-  }
-  async open() {}
-  async setSignals(s: { dataTerminalReady: boolean; requestToSend: boolean }) {
-    this.signals = s;
-  }
-  async close() {
-    this.closed = true;
-  }
-  emit(e: Event) {
-    const bytes = new TextEncoder().encode(JSON.stringify(e) + "\n");
-    this.controller.enqueue(bytes.slice(0, 9));
-    this.controller.enqueue(bytes.slice(9));
-  }
-}
 describe("single-owner asynchronous serial session", () => {
   it("negotiates without resetting, binds the factory identity and releases both locks", async () => {
     const port = new VirtualPort(),

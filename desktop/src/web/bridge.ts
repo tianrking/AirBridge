@@ -23,6 +23,21 @@ import {
   type SerialAPI,
 } from "./platform";
 import { Session } from "./session";
+export const RELEASE_TIMEOUT_MS = 5000;
+function interruptible<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  if (signal.aborted)
+    return Promise.reject(new Error("Source preparation cancelled"));
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new Error("Source preparation cancelled"));
+    signal.addEventListener("abort", abort, { once: true });
+    promise
+      .then(resolve, reject)
+      .finally(() => signal.removeEventListener("abort", abort));
+  });
+}
 export class WebBridge {
   snapshot: Snapshot = {
     revision: 0,
@@ -41,13 +56,19 @@ export class WebBridge {
   private names = new Map<string, string>();
   private session?: Session;
   private operation: "send" | "resolve" | null = null;
+  private operationAbort?: AbortController;
   private cancelRequested = false;
+  private cancelTask?: Promise<Event>;
   private nativeStarted = false;
   private outgoingId: string | null = null;
   private running?: Promise<void>;
   private incomingParts = new Map<string, number>();
   private receipts = new Map<string, Event>();
   private expiry?: ReturnType<typeof setInterval>;
+  private epoch = 0;
+  private connecting = false;
+  private opening?: Promise<void>;
+  private cleanup?: Promise<void>;
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => {
@@ -194,8 +215,9 @@ export class WebBridge {
         break;
       case "outgoing_stage":
         if (outgoing && !terminal(outgoing.state)) {
-          outgoing.state =
-            e.stage === "awaiting_acceptance"
+          outgoing.state = this.cancelRequested
+            ? "cancelling"
+            : e.stage === "awaiting_acceptance"
               ? "waiting"
               : ["accepted", "uploading"].includes(String(e.stage))
                 ? "sending"
@@ -217,8 +239,11 @@ export class WebBridge {
           outgoing.updated = Date.now();
           outgoing.done = e.wire_bytes;
           outgoing.progress_total = e.wire_total;
-          outgoing.state =
-            outgoing.done === outgoing.progress_total ? "finishing" : "sending";
+          outgoing.state = this.cancelRequested
+            ? "cancelling"
+            : outgoing.done === outgoing.progress_total
+              ? "finishing"
+              : "sending";
         }
         break;
       case "outgoing_complete":
@@ -245,6 +270,19 @@ export class WebBridge {
         if (t) {
           this.incomingParts.set(String(e.name), Number(e.bytes));
           t.done = [...this.incomingParts.values()].reduce((a, b) => a + b, 0);
+          t.updated = Date.now();
+        }
+        break;
+      }
+      case "incoming_failed": {
+        let t = this.incoming(e.transfer_id);
+        if (!t) {
+          this.start(e, false);
+          t = this.incoming(e.transfer_id);
+        }
+        if (t && !terminal(t.state)) {
+          t.state = e.uncertain === true ? "uncertain" : "failed";
+          t.error = `${e.phase ?? "receive"}: ${e.message}`;
           t.updated = Date.now();
         }
         break;
@@ -281,28 +319,68 @@ export class WebBridge {
     }
     this.publish();
   };
-  private failure = (error: Error) => {
+  private retire(error: string) {
     clearInterval(this.expiry);
-    this.snapshot.error = error.message;
-    this.snapshot.connection = "error";
+    this.operationAbort?.abort();
+    this.snapshot.can_resolve = false;
     this.snapshot.resolving_peer = null;
     this.snapshot.peers = [];
     for (const t of this.snapshot.transfers)
       if (!terminal(t.state)) {
         t.updated = Date.now();
         t.state = "uncertain";
-        t.error = error.message;
+        t.error = error;
       }
+  }
+  private failure = (error: Error) => {
+    this.epoch++;
+    this.snapshot.error = error.message;
+    this.retire(error.message);
+    this.snapshot.connection = "recovering";
     this.publish();
-    const session = this.session;
-    if (session)
-      void session
-        .close()
-        .then(() => {
-          if (this.session === session) this.session = undefined;
-        })
-        .catch(() => {});
+    void this.release("error").catch(() => {});
   };
+  private async release(next: "error" | "disconnected") {
+    if (this.cleanup) return this.cleanup;
+    const session = this.session;
+    const task = (async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        if (session)
+          await Promise.race([
+            session.close(),
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      "Serial cleanup timed out. Port ownership is unconfirmed; retry disconnect before reconnecting",
+                    ),
+                  ),
+                RELEASE_TIMEOUT_MS,
+              );
+            }),
+          ]);
+        if (this.session === session) this.session = undefined;
+        await this.running;
+        this.operation = null;
+        this.snapshot.connection = next;
+      } catch (error) {
+        this.snapshot.connection = "cleanup_failed";
+        this.snapshot.error = `Port release not confirmed: ${String(error)}`;
+        throw error;
+      } finally {
+        clearTimeout(timer);
+        this.publish();
+      }
+    })();
+    this.cleanup = task;
+    try {
+      await task;
+    } finally {
+      if (this.cleanup === task) this.cleanup = undefined;
+    }
+  }
   async call<T>(verb: string, args: Record<string, unknown> = {}): Promise<T> {
     switch (verb) {
       case "dismiss_error":
@@ -311,7 +389,7 @@ export class WebBridge {
         return null as T;
       case "choose_receive_folder": {
         check(
-          !this.session && !this.operation,
+          !this.session && !this.operation && !this.connecting && !this.cleanup,
           "Disconnect before changing the receive folder",
         );
         const pick = (window as BrowserPlatform).showDirectoryPicker;
@@ -368,7 +446,9 @@ export class WebBridge {
           "File selection expired or another operation is active",
         );
         this.operation = "send";
+        this.operationAbort = new AbortController();
         this.cancelRequested = false;
+        this.cancelTask = undefined;
         this.nativeStarted = false;
         const file = this.selected.file;
         this.selected = undefined;
@@ -380,14 +460,19 @@ export class WebBridge {
           this.operation === "send" && this.session,
           "No outgoing transfer to cancel",
         );
-        if (this.cancelRequested) return null as T;
+        if (
+          this.cancelRequested ||
+          (this.outgoing() && terminal(this.outgoing()!.state))
+        )
+          return null as T;
         this.cancelRequested = true;
         if (this.outgoing()) {
           this.outgoing()!.state = "cancelling";
           this.outgoing()!.updated = Date.now();
         }
         this.publish();
-        await this.session.request("CANCEL");
+        if (!this.nativeStarted) this.operationAbort?.abort();
+        await this.cancelNative(this.session);
         return null as T;
       case "open_receive_folder": {
         const receipt = this.receipts.get(String(args.transferId));
@@ -423,7 +508,21 @@ export class WebBridge {
     );
     return peer;
   }
-  private async connect() {
+  private connect() {
+    check(
+      !this.connecting && !this.cleanup && !this.session && !this.operation,
+      "Disconnect and finish port cleanup before reconnecting",
+    );
+    this.connecting = true;
+    const epoch = ++this.epoch;
+    const task = this.openConnection(epoch).finally(() => {
+      this.connecting = false;
+      if (this.opening === task) this.opening = undefined;
+    });
+    this.opening = task;
+    return task;
+  }
+  private async openConnection(epoch: number) {
     check(!supportIssue(), supportIssue() ?? "Unsupported browser");
     check(
       this.directory,
@@ -434,15 +533,27 @@ export class WebBridge {
     const port = await api.requestPort({
       filters: [{ usbVendorId: 0x303a, usbProductId: 0x1001 }],
     });
-    // Choosing is metadata only. Release the prior owner before actually opening.
-    if (this.session) await this.disconnect();
+    check(epoch === this.epoch, "Connection selection was cancelled");
     this.snapshot.connection = "connecting";
     this.snapshot.error = null;
     this.publish();
-    const session = new Session(port, this.directory, this.event, this.failure);
+    const session = new Session(
+      port,
+      this.directory,
+      (e) => {
+        if (this.session === session && epoch === this.epoch) this.event(e);
+      },
+      (error) => {
+        if (this.session === session && epoch === this.epoch)
+          this.failure(error);
+      },
+    );
     this.session = session;
     try {
       const caps = await session.open();
+      check(epoch === this.epoch, "Connection attempt was cancelled");
+      this.names.clear();
+      this.snapshot.peers = [];
       this.snapshot.connection = "connected";
       this.snapshot.radio_mac = String(caps.radio_mac);
       this.snapshot.can_resolve = caps.resolve === true;
@@ -475,34 +586,27 @@ export class WebBridge {
       }, 1000);
       this.publish();
     } catch (e) {
-      this.session = undefined;
-      this.failure(e instanceof Error ? e : new Error(String(e)));
+      if (epoch === this.epoch) {
+        this.snapshot.error = e instanceof Error ? e.message : String(e);
+        this.retire(this.snapshot.error);
+        this.snapshot.connection = "recovering";
+        this.publish();
+        await this.release("error").catch(() => {});
+      }
       throw e;
     }
   }
   private async disconnect() {
-    clearInterval(this.expiry);
-    const session = this.session;
-    this.session = undefined;
-    let closeError: unknown;
-    try {
-      if (session) await session.close();
-    } catch (error) {
-      closeError = error;
-    }
-    await this.running;
-    this.operation = null;
-    this.snapshot.resolving_peer = null;
-    this.snapshot.connection = "disconnected";
-    this.snapshot.peers = [];
-    for (const t of this.snapshot.transfers)
-      if (!terminal(t.state)) {
-        t.updated = Date.now();
-        t.state = "uncertain";
-        t.error = "Disconnected before native completion";
-      }
+    this.epoch++;
+    this.retire("Disconnected before native completion");
+    this.snapshot.connection = "disconnecting";
     this.publish();
-    if (closeError) throw closeError;
+    // If the chooser is still open, its eventual result is invalidated above.
+    if (this.opening) {
+      if (this.session) await this.release("disconnected");
+      await this.opening.catch(() => {});
+    }
+    await this.release("disconnected");
   }
   private async resolve(peer: string, port: number) {
     const session = this.session!;
@@ -526,6 +630,11 @@ export class WebBridge {
       this.publish();
     }
   }
+  private cancelNative(session: Session) {
+    return (this.cancelTask ??= Promise.resolve().then(() =>
+      session.request("CANCEL"),
+    ));
+  }
   private async send(
     file: Blob & { name: string },
     peer: string,
@@ -535,13 +644,29 @@ export class WebBridge {
     const id = crypto.randomUUID().toUpperCase();
     this.outgoingId = id;
     let transfer: Transfer | undefined;
+    let began = false;
+    const signal = this.operationAbort!.signal;
+    this.start(
+      {
+        event: "outgoing_started",
+        transfer_id: id,
+        name: file.name,
+        peer,
+        bytes: file.size,
+      },
+      true,
+    );
+    transfer = this.outgoing();
+    this.publish();
     try {
-      const data = new Uint8Array(await file.arrayBuffer());
+      const data = new Uint8Array(
+        await interruptible(file.arrayBuffer(), signal),
+      );
       check(
         data.length <= Number(session.capabilities!.max_file),
         "Source exceeds the connected firmware's staging limit",
       );
-      const hash = await sha256(data);
+      const hash = await interruptible(sha256(data), signal);
       check(this.session === session, "Session ended before source staging");
       const metadata = manifest(
         file.name,
@@ -549,23 +674,18 @@ export class WebBridge {
         String(session.capabilities!.radio_mac).replaceAll(":", ""),
         id,
       );
-      this.start(
-        {
-          event: "outgoing_started",
-          transfer_id: id,
-          name: file.name,
-          peer,
-          bytes: data.length,
-          sha256: hash,
-        },
-        true,
-      );
-      this.publish();
       transfer = this.outgoing();
+      check(
+        transfer && !terminal(transfer.state),
+        "Transfer ended before staging",
+      );
+      transfer.sha256 = hash;
+      this.publish();
       check(!this.cancelRequested, "Staging cancelled");
       await session.request(
         `BEGIN ${data.length} ${metadata.length} ${hash} ${peer} ${port}`,
       );
+      began = true;
       for (const [verb, bytes] of [
         ["META", metadata],
         ["DATA", data],
@@ -610,7 +730,7 @@ export class WebBridge {
         // Stop an unresolved native operation cooperatively; never resend it.
         if (this.session === session && !this.cancelRequested) {
           this.cancelRequested = true;
-          await session.request("CANCEL").catch(() => {});
+          await this.cancelNative(session).catch(() => {});
         }
         throw error;
       } finally {
@@ -634,12 +754,16 @@ export class WebBridge {
       transfer.done = transfer.bytes;
       transfer.progress_total = transfer.bytes;
     } catch (e) {
+      if (began && !this.nativeStarted && this.session === session)
+        await this.cancelNative(session).catch(() => {});
       transfer = this.outgoing();
       if (transfer && !terminal(transfer.state)) {
         transfer.state =
           this.cancelRequested && !this.nativeStarted
             ? "cancelled"
-            : "uncertain";
+            : !this.nativeStarted
+              ? "failed"
+              : "uncertain";
         transfer.error = String(e);
       }
       this.snapshot.error = String(e);

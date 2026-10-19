@@ -33,6 +33,11 @@ import {
   type SelectedFile,
 } from "./types";
 import { useBridge } from "./useBridge";
+import {
+  connectionBusy,
+  connectionLabel,
+  ownsConnection,
+} from "./presentation";
 import brand from "./brand.svg";
 export default function App() {
   const bridge = useBridge();
@@ -48,6 +53,8 @@ export default function App() {
   const copy = translations[language];
   const webCopy = webTranslations[language];
   const connected = snapshot.connection === "connected";
+  const busyConnection = connectionBusy(snapshot.connection);
+  const ownsPort = ownsConnection(snapshot.connection);
   const peers = snapshot.peers.filter((peer) => peer.advertised);
   const target = peers.find((peer) => peer.mac === selectedPeer);
   const outgoing = snapshot.transfers.find(
@@ -81,7 +88,7 @@ export default function App() {
       return;
     }
     void bridge.call(
-      connected
+      connected || snapshot.connection === "cleanup_failed"
         ? "disconnect_bridge"
         : !bridge.native && !snapshot.receive_directory
           ? "choose_receive_folder"
@@ -142,7 +149,7 @@ export default function App() {
               <strong>ESP32-S3</strong>
               <span>
                 <i className={`dot ${connected ? "green" : "gray"}`} />
-                {connected ? copy.connected : copy.disconnected}
+                {connectionLabel(snapshot.connection, copy)}
               </span>
             </div>
           </div>
@@ -155,7 +162,9 @@ export default function App() {
           <span>{copy[page]}</span>
           <div className="topbar-status">
             <i className={`dot ${connected ? "green" : "gray"}`} />
-            {connected ? copy.ready : copy.disconnected}
+            {connected
+              ? copy.ready
+              : connectionLabel(snapshot.connection, copy)}
           </div>
         </header>
         <div className={`page-content ${page === "share" ? "share-page" : ""}`}>
@@ -206,7 +215,13 @@ export default function App() {
                     {copy.bridge}
                     <span className="chip">ESP32-S3</span>
                   </strong>
-                  <p>{connected ? copy.ready : copy.connectionHelp}</p>
+                  <p>
+                    {connected
+                      ? copy.ready
+                      : ownsPort
+                        ? copy.releaseHint
+                        : copy.connectionHelp}
+                  </p>
                 </div>
                 <button
                   className="icon-button bridge-info"
@@ -223,20 +238,22 @@ export default function App() {
                   disabled={
                     bridge.pending ||
                     Boolean(bridge.unsupported) ||
-                    snapshot.connection === "connecting"
+                    busyConnection
                   }
                   onClick={connectAction}
                 >
-                  {snapshot.connection === "connecting" ? (
+                  {busyConnection ? (
                     <LoaderCircle size={15} className="spin" />
                   ) : null}
                   {connected
                     ? copy.disconnect
-                    : snapshot.connection === "connecting"
-                      ? copy.connecting
-                      : !bridge.native && !snapshot.receive_directory
-                        ? webCopy.prepare
-                        : copy.connect}
+                    : snapshot.connection === "cleanup_failed"
+                      ? copy.retryRelease
+                      : busyConnection
+                        ? connectionLabel(snapshot.connection, copy)
+                        : !bridge.native && !snapshot.receive_directory
+                          ? webCopy.prepare
+                          : copy.connect}
                 </button>
               </section>
               <DiscoveryStage
@@ -352,7 +369,7 @@ export default function App() {
                     className="text-button"
                     disabled={
                       !bridge.native &&
-                      (connected ||
+                      (ownsPort ||
                         bridge.pending ||
                         Boolean(bridge.unsupported))
                     }
@@ -439,12 +456,12 @@ export default function App() {
                   <p className="folder-path">
                     {snapshot.receive_directory || webCopy.noFolder}
                   </p>
-                  {connected ? <p>{copy.disconnectFolder}</p> : null}
+                  {ownsPort ? <p>{copy.disconnectFolder}</p> : null}
                   {!bridge.native ? <p>{copy.folderBrowserHint}</p> : null}
                 </div>
                 <button
                   className="secondary compact"
-                  disabled={connected || bridge.pending}
+                  disabled={ownsPort || bridge.pending}
                   onClick={async () => {
                     const folder = await bridge.call<string | null>(
                       "choose_receive_folder",
@@ -461,7 +478,11 @@ export default function App() {
                 </span>
                 <div className="setting-copy">
                   <h2>{copy.connectionDetails}</h2>
-                  <p>{connected ? copy.ready : copy.disconnected}</p>
+                  <p>
+                    {connected
+                      ? copy.ready
+                      : connectionLabel(snapshot.connection, copy)}
+                  </p>
                 </div>
                 <button
                   className="secondary compact"
