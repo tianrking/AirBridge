@@ -10,6 +10,16 @@ import {
 import type { DiskDirectory, SerialPort } from "./platform";
 import { Receiver, receiveEvents } from "./receiver";
 export const RECEIVE_IDLE_MS = 60000;
+const wireNotifications = new Set([
+  "scanner_status",
+  "peer_identity",
+  "peer_resolved",
+  "outgoing_peer",
+  "outgoing_stage",
+  "outgoing_progress",
+  "outgoing_complete",
+  "resolution_complete",
+]);
 type Waiter = {
   resolve: (e: Event) => void;
   reject: (error: Error) => void;
@@ -240,7 +250,7 @@ export class Session {
                   RECEIVE_IDLE_MS,
                 );
             }
-            this.emit(e);
+            if (wireNotifications.has(e.event)) this.emit(e);
             for (const item of [...this.waiting])
               if (item.test(e)) {
                 this.waiting.delete(item);

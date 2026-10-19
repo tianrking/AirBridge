@@ -342,7 +342,7 @@ export function TransferDetails({
         <summary>{copy.operationDetails}</summary>
         <dl className="detail-list">
           <DetailRow label={copy.transferId}>
-            <CopyValue value={transfer.id} copy={copy} />
+            <CopyValue value={transfer.native_id ?? transfer.id} copy={copy} />
           </DetailRow>
           {transfer.peer ? (
             <DetailRow label={copy.awdlAddress}>

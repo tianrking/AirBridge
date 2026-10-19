@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   filteredTransfers,
+  connectionBusy,
+  ownsConnection,
+  connectionLabel,
   progressOf,
   timeLabel,
   transferName,
@@ -23,6 +26,19 @@ const base: Transfer = {
   updated: 0,
 };
 describe("honest presentation", () => {
+  it("keeps unconfirmed ownership blocked while exposing a cleanup retry", () => {
+    for (const state of ["connecting", "recovering", "disconnecting"]) {
+      expect(connectionBusy(state)).toBe(true);
+      expect(ownsConnection(state)).toBe(true);
+    }
+    expect(connectionBusy("cleanup_failed")).toBe(false);
+    expect(ownsConnection("cleanup_failed")).toBe(true);
+    for (const state of ["disconnected", "error"])
+      expect(ownsConnection(state)).toBe(false);
+    expect(connectionLabel("cleanup_failed", translations.en)).toBe(
+      "Port release unconfirmed",
+    );
+  });
   it("does not turn complete preparation or archive bytes into delivery", () => {
     expect(progressOf(base)).toBe(100);
     expect(base.state).toBe("preparing");

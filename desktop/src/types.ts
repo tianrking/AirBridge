@@ -25,6 +25,7 @@ export interface TransferFile {
 }
 export interface Transfer {
   id: string;
+  native_id?: string;
   name: string;
   direction: "send" | "receive";
   peer: string | null;

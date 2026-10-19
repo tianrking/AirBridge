@@ -7,8 +7,9 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, File, OpenOptions},
-    io::Write,
+    io::{Read, Write},
     path::PathBuf,
+    time::{Duration, Instant},
 };
 
 fn number(event: &Value, key: &str) -> Result<u64> {
@@ -45,6 +46,8 @@ struct Job {
     names: BTreeSet<String>,
     published: Option<PathBuf>,
     complete: bool,
+    failed: bool,
+    progress_at: Instant,
 }
 #[derive(Default)]
 pub struct Handled {
@@ -54,6 +57,7 @@ pub struct Handled {
 pub struct Receiver {
     directory: PathBuf,
     job: Option<Job>,
+    failure: Option<Value>,
 }
 impl Receiver {
     pub fn new(directory: PathBuf) -> Result<Self> {
@@ -61,9 +65,79 @@ impl Receiver {
         Ok(Self {
             directory: fs::canonicalize(directory)?,
             job: None,
+            failure: None,
         })
     }
+    pub fn check_timeout(&mut self, now: Instant) -> Result<()> {
+        if let Some(job) = self.job.as_mut().filter(|job| {
+            !job.complete
+                && !job.failed
+                && now.saturating_duration_since(job.progress_at) >= Duration::from_secs(60)
+        }) {
+            job.failed = true;
+            for file in job.files.values_mut() {
+                file.stream.take();
+            }
+            self.failure = Some(
+                json!({"event":"incoming_failed","transfer_id":job.id,"phase":"receive_timeout","message":"Receive progress timed out; completion unconfirmed","uncertain":true,"directory":job.published.as_ref().unwrap_or(&job.temporary)}),
+            );
+            anyhow::bail!("Receive progress timed out; completion unconfirmed");
+        }
+        Ok(())
+    }
+    pub fn take_failure(&mut self) -> Option<Value> {
+        self.failure.take()
+    }
     pub fn handle(&mut self, event: &Value) -> Result<Handled> {
+        let kind = event["event"].as_str().unwrap_or("");
+        if !matches!(
+            kind,
+            "transfer_begin"
+                | "manifest_file"
+                | "file_begin"
+                | "file_chunk"
+                | "file_end"
+                | "transfer_ready"
+                | "transfer_complete"
+        ) {
+            return Ok(Handled::default());
+        }
+        ensure!(
+            !self.job.as_ref().is_some_and(|job| job.failed),
+            "Receive job already failed"
+        );
+        let result = (|| {
+            if kind != "transfer_begin" {
+                if let Some(id) = event.get("transfer_id") {
+                    ensure!(
+                        self.job
+                            .as_ref()
+                            .is_some_and(|job| id.as_str() == Some(job.id.as_str())),
+                        "Incoming transfer identity mismatch"
+                    );
+                }
+            }
+            self.process(event)
+        })();
+        if let Err(error) = &result {
+            if let Some(job) = self.job.as_mut().filter(|job| !job.complete && !job.failed) {
+                job.failed = true;
+                for file in job.files.values_mut() {
+                    file.stream.take();
+                }
+                self.failure = Some(
+                    json!({"event":"incoming_failed","transfer_id":job.id,"phase":kind,"message":format!("{error:#}"),"uncertain":job.published.is_some(),"directory":job.published.as_ref().unwrap_or(&job.temporary)}),
+                );
+            }
+        }
+        if result.is_ok() {
+            if let Some(job) = &mut self.job {
+                job.progress_at = Instant::now();
+            }
+        }
+        result
+    }
+    fn process(&mut self, event: &Value) -> Result<Handled> {
         let mut output = Handled::default();
         match event["event"].as_str().unwrap_or("") {
             "transfer_begin" => {
@@ -92,9 +166,11 @@ impl Receiver {
                     names: BTreeSet::new(),
                     published: None,
                     complete: false,
+                    failed: false,
+                    progress_at: Instant::now(),
                 });
                 output.event = Some(
-                    json!({"event":"incoming_started","transfer_id":id,"files":count,"bytes":total}),
+                    json!({"event":"incoming_started","transfer_id":id,"files":count,"bytes":total,"directory":self.job.as_ref().unwrap().temporary}),
                 );
             }
             "manifest_file" => {
@@ -157,7 +233,12 @@ impl Receiver {
                 ensure!(
                     name == expected
                         && (metadata || size == offer.size)
-                        && size <= 64 * 1024 * 1024
+                        && size
+                            <= if metadata {
+                                128 * 1024
+                            } else {
+                                64 * 1024 * 1024
+                            }
                         && !job.files.contains_key(&index)
                         && job.names.insert(name.to_lowercase()),
                     "Incoming file differs from offer"
@@ -232,6 +313,7 @@ impl Receiver {
                 stream.flush()?;
                 stream.sync_all()?;
                 drop(stream);
+                verify_file(&job.temporary.join(&file.name), file.size, &hash)?;
                 file.sha256 = Some(hash);
             }
             "transfer_ready" => {
@@ -254,6 +336,7 @@ impl Receiver {
                             == job.files.values().map(|file| file.size).sum::<u64>(),
                     "Cannot publish incomplete transfer"
                 );
+                verify_files(job)?;
                 let destination =
                     self.directory
                         .join(format!("{}-{}", job.id, uuid::Uuid::new_v4().simple()));
@@ -276,12 +359,19 @@ impl Receiver {
                     .published
                     .as_ref()
                     .context("Completion without publication")?;
+                verify_files(job)?;
                 let files:Vec<_>=job.files.values().map(|file|json!({"name":file.name,"bytes":file.size,"sha256":file.sha256,"metadata":file.metadata})).collect();
                 let receipt = json!({"event":"received","transfer_id":job.id,"directory":directory,"total_bytes":job.total,"files":files});
                 let path = directory.with_extension("receipt.json");
                 let mut record = OpenOptions::new().write(true).create_new(true).open(path)?;
-                record.write_all(&serde_json::to_vec_pretty(&receipt)?)?;
+                let payload = serde_json::to_vec_pretty(&receipt)?;
+                record.write_all(&payload)?;
                 record.sync_all()?;
+                drop(record);
+                ensure!(
+                    fs::read(directory.with_extension("receipt.json"))? == payload,
+                    "Saved receipt readback differs"
+                );
                 job.complete = true;
                 output.event = Some(receipt);
             }
@@ -289,6 +379,42 @@ impl Receiver {
         }
         Ok(output)
     }
+}
+
+fn verify_file(path: &std::path::Path, size: u64, expected: &str) -> Result<()> {
+    let mut file = File::open(path)?;
+    ensure!(
+        file.metadata()?.is_file() && file.metadata()?.len() == size,
+        "Saved file size differs"
+    );
+    let mut hash = Sha256::new();
+    let mut total = 0_u64;
+    let mut bytes = [0_u8; 65536];
+    loop {
+        let count = file.read(&mut bytes)?;
+        if count == 0 {
+            break;
+        }
+        total += count as u64;
+        ensure!(total <= size, "Saved file grew during verification");
+        hash.update(&bytes[..count]);
+    }
+    ensure!(
+        total == size && format!("{:x}", hash.finalize()) == expected,
+        "Saved file SHA256 differs"
+    );
+    Ok(())
+}
+fn verify_files(job: &Job) -> Result<()> {
+    let directory = job.published.as_ref().unwrap_or(&job.temporary);
+    for file in job.files.values() {
+        verify_file(
+            &directory.join(&file.name),
+            file.size,
+            file.sha256.as_deref().context("Unchecked file")?,
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -302,6 +428,115 @@ mod tests {
             .unwrap();
         receiver.handle(&json!({"event":"manifest_file","index":0,"size":3,"name_b64":STANDARD.encode("file.bin")})).unwrap();
         receiver.handle(&json!({"event":"file_begin","index":0,"size":3,"name_b64":STANDARD.encode("file.bin"),"metadata":false})).unwrap();
+    }
+    fn checked(receiver: &mut Receiver) {
+        offer(receiver);
+        receiver
+            .handle(&json!({"event":"file_chunk","index":0,"offset":0,"data":"YWJj"}))
+            .unwrap();
+        receiver.handle(&json!({"event":"file_end","index":0,"bytes":3,"sha256":format!("{:x}",Sha256::digest(b"abc"))})).unwrap();
+    }
+    fn commit() -> Value {
+        json!({"event":"transfer_ready","transfer_id":"TEST-1","nonce":"a".repeat(32),"files":1,"total_bytes":3})
+    }
+    fn complete() -> Value {
+        json!({"event":"transfer_complete","transfer_id":"TEST-1","host_committed":true,"response_written":true})
+    }
+    #[test]
+    fn scanner_traffic_does_not_extend_receive_deadlines() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut receiver = Receiver::new(temp.path().into()).unwrap();
+        offer(&mut receiver);
+        let start = receiver.job.as_ref().unwrap().progress_at;
+        receiver
+            .handle(&json!({"event":"scanner_status","peers":[]}))
+            .unwrap();
+        assert_eq!(receiver.job.as_ref().unwrap().progress_at, start);
+        assert!(receiver
+            .check_timeout(start + Duration::from_secs(60))
+            .is_err());
+        assert_eq!(receiver.take_failure().unwrap()["phase"], "receive_timeout");
+        assert!(receiver.handle(&commit()).is_err());
+    }
+    #[test]
+    fn detects_saved_file_changes_at_every_publication_boundary() {
+        for phase in [0, 1, 2] {
+            let temp = tempfile::tempdir().unwrap();
+            let mut receiver = Receiver::new(temp.path().into()).unwrap();
+            if phase == 0 {
+                offer(&mut receiver);
+                receiver
+                    .handle(&json!({"event":"file_chunk","index":0,"offset":0,"data":"YWJj"}))
+                    .unwrap();
+            } else {
+                checked(&mut receiver);
+            }
+            if phase == 2 {
+                receiver.handle(&commit()).unwrap();
+            }
+            let job = receiver.job.as_ref().unwrap();
+            let dir = job.published.as_ref().unwrap_or(&job.temporary).clone();
+            fs::write(dir.join("file.bin"), b"xyz").unwrap();
+            let result = if phase == 0 {
+                receiver.handle(&json!({"event":"file_end","index":0,"bytes":3,"sha256":format!("{:x}",Sha256::digest(b"abc"))}))
+            } else if phase == 1 {
+                receiver.handle(&commit())
+            } else {
+                receiver.handle(&complete())
+            };
+            assert!(result.is_err());
+            let failed = receiver.take_failure().unwrap();
+            assert_eq!(failed["event"], "incoming_failed");
+            assert_eq!(failed["uncertain"], phase == 2);
+            assert!(receiver.handle(&complete()).is_err());
+            assert!(!dir.with_extension("receipt.json").exists());
+        }
+    }
+    #[test]
+    fn completion_receipt_failure_does_not_claim_success() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut receiver = Receiver::new(temp.path().into()).unwrap();
+        checked(&mut receiver);
+        receiver.handle(&commit()).unwrap();
+        let path = receiver
+            .job
+            .as_ref()
+            .unwrap()
+            .published
+            .as_ref()
+            .unwrap()
+            .with_extension("receipt.json");
+        fs::create_dir(&path).unwrap();
+        assert!(receiver.handle(&complete()).is_err());
+        assert_eq!(receiver.take_failure().unwrap()["uncertain"], true);
+        assert!(receiver.handle(&complete()).is_err());
+    }
+    #[test]
+    fn rejects_wrong_transfer_and_oversized_metadata_without_recovering_the_job() {
+        for wrong_identity in [true, false] {
+            let temp = tempfile::tempdir().unwrap();
+            let mut receiver = Receiver::new(temp.path().into()).unwrap();
+            offer(&mut receiver);
+            let invalid = if wrong_identity {
+                json!({"event":"file_chunk","transfer_id":"OTHER","index":0,"offset":0,"data":"YWJj"})
+            } else {
+                json!({"event":"file_begin","index":16,"metadata":true,"size":131073,"name_b64":STANDARD.encode("._file.bin")})
+            };
+            assert!(receiver.handle(&invalid).is_err());
+            assert!(receiver.take_failure().is_some());
+            assert!(receiver.handle(&commit()).is_err());
+        }
+    }
+    #[test]
+    fn a_native_response_failure_cannot_be_repaired_by_a_later_success() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut receiver = Receiver::new(temp.path().into()).unwrap();
+        checked(&mut receiver);
+        receiver.handle(&commit()).unwrap();
+        let mut response = complete();
+        response["response_written"] = json!(false);
+        assert!(receiver.handle(&response).is_err());
+        assert!(receiver.handle(&complete()).is_err());
     }
     #[test]
     fn refuses_offsets_and_unchecked_commit() {
@@ -322,9 +557,6 @@ mod tests {
             .handle(&json!({"event":"file_chunk","index":0,"offset":0,"data":"YWJj"}))
             .unwrap();
         assert_eq!(chunk.acknowledgement.unwrap(), b"CHUNK TEST-1 0 3\n");
-        assert!(receiver
-            .handle(&json!({"event":"file_end","index":0,"bytes":3,"sha256":"0".repeat(64)}))
-            .is_err());
         let hash = format!("{:x}", Sha256::digest(b"abc"));
         receiver
             .handle(&json!({"event":"file_end","index":0,"bytes":3,"sha256":hash}))
@@ -333,7 +565,6 @@ mod tests {
         assert_eq!(ready.event.as_ref().unwrap()["event"], "incoming_verifying");
         assert_ne!(ready.event.as_ref().unwrap()["event"], "received");
         assert!(ready.acknowledgement.unwrap().starts_with(b"COMMIT "));
-        assert!(receiver.handle(&json!({"event":"transfer_complete","transfer_id":"TEST-1","host_committed":true,"response_written":false})).is_err());
         let result=receiver.handle(&json!({"event":"transfer_complete","transfer_id":"TEST-1","host_committed":true,"response_written":true})).unwrap().event.unwrap();
         let path = PathBuf::from(result["directory"].as_str().unwrap());
         assert_eq!(fs::read(path.join("file.bin")).unwrap(), b"abc");

@@ -126,6 +126,12 @@ impl Client {
             !self.stop.load(Ordering::Relaxed),
             "Serial owner stopped; unfinished operation outcome uncertain"
         );
+        if let Err(error) = self.receiver.check_timeout(Instant::now()) {
+            if let Some(failure) = self.receiver.take_failure() {
+                (self.events)(failure);
+            }
+            return Err(error);
+        }
         let mut buffer = [0u8; 4096];
         let size = match self.port.read(&mut buffer) {
             Ok(count) => count,
@@ -196,12 +202,24 @@ impl Client {
                 "scanner_status" => {
                     (self.events)(json!({"event":"peers","peers":event["peers"]}));
                 }
-                "peer_identity" | "outgoing_stage" | "outgoing_progress" | "resolve_stage" => {
+                "outgoing_progress" => {
+                    validate_progress(&event)?;
+                    (self.events)(event.clone());
+                }
+                "peer_identity" | "outgoing_stage" | "resolve_stage" => {
                     (self.events)(event.clone());
                 }
                 _ => {}
             }
-            let handled = self.receiver.handle(&event)?;
+            let handled = match self.receiver.handle(&event) {
+                Ok(handled) => handled,
+                Err(error) => {
+                    if let Some(failure) = self.receiver.take_failure() {
+                        (self.events)(failure);
+                    }
+                    return Err(error);
+                }
+            };
             if let Some(ack) = handled.acknowledgement {
                 self.port.write_all(&ack)?;
             }
@@ -328,6 +346,19 @@ impl Client {
     }
 }
 
+fn validate_progress(event: &Value) -> Result<()> {
+    let done = event["wire_bytes"]
+        .as_u64()
+        .context("Invalid archive byte count")?;
+    let total = event["wire_total"]
+        .as_u64()
+        .context("Invalid archive size")?;
+    ensure!(
+        done <= total && total <= 9_007_199_254_740_991,
+        "Invalid archive progress"
+    );
+    Ok(())
+}
 // This gate runs before publishing a successful host event to the desktop UI.
 fn validate_success(outcome: &Value, bytes: usize, hash: &str) -> Result<()> {
     ensure!(
@@ -342,6 +373,18 @@ fn validate_success(outcome: &Value, bytes: usize, hash: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rejects_invalid_wire_progress_before_publishing_it() {
+        assert!(validate_progress(&json!({"wire_bytes":0,"wire_total":0})).is_ok());
+        for event in [
+            json!({"wire_bytes":-1,"wire_total":3}),
+            json!({"wire_bytes":4,"wire_total":3}),
+            json!({"wire_bytes":0.5,"wire_total":3}),
+            json!({"wire_bytes":0,"wire_total":9007199254740992_u64}),
+        ] {
+            assert!(validate_progress(&event).is_err());
+        }
+    }
     #[test]
     fn native_success_is_not_publishable_with_a_different_source() {
         let hash = "a".repeat(64);

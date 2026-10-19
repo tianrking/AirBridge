@@ -35,6 +35,7 @@ export function filteredTransfers(
           t.peer_name,
           t.peer,
           t.id,
+          t.native_id,
           ...(t.files ?? []).map((f) => f.name),
         ].some((s) => s?.toLocaleLowerCase().includes(needle))),
   );

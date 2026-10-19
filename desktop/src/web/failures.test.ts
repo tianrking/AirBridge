@@ -89,6 +89,19 @@ function incoming(port: VirtualPort) {
 }
 
 describe("session fault boundaries", () => {
+  it("never opens an unapproved USB transport", async () => {
+    const port = new VirtualPort();
+    port.getInfo = () => ({ usbVendorId: 0x1234, usbProductId: 0x5678 });
+    const session = new Session(
+      port,
+      await directory(),
+      () => {},
+      () => {},
+    );
+    await expect(session.open()).rejects.toThrow(/native USB/);
+    expect(port.openCalls).toBe(0);
+    expect(port.records).toEqual([]);
+  });
   it.each(["qualification_boot", "command_invalid"])(
     "fails once on %s and rejects pending work",
     async (event) => {
@@ -135,6 +148,120 @@ describe("session fault boundaries", () => {
     await all;
     await session.close();
     expect(port.records.filter((r) => r.includes(" STATUS "))).toHaveLength(1);
+  });
+});
+
+describe("repeated ownership and duplex history", () => {
+  it("completes 30 reconnect cycles with fresh handshakes and no orphan reader", async () => {
+    const { bridge, port } = await setup();
+    await bridge.call("disconnect_bridge");
+    for (let n = 0; n < 30; n++) {
+      await bridge.call("connect_bridge");
+      await bridge.call("disconnect_bridge");
+      expect(
+        port.closed && !port.readable.locked && !port.writable.locked,
+      ).toBe(true);
+    }
+    const hello = port.records.filter((r) => r.includes("HELLO"));
+    expect(hello).toHaveLength(31);
+    expect(new Set(hello.map((r) => r.split(" ")[3])).size).toBe(31);
+  });
+  it("does not accept wire records posing as host-verified results", async () => {
+    const { bridge, port } = await setup();
+    port.emit({ event: "incoming_started", transfer_id: "FAKE", bytes: 3 });
+    port.emit({
+      event: "received",
+      transfer_id: "FAKE",
+      files: [],
+      directory: "not-verified",
+    });
+    port.emit({ event: "scanner_status", peers: [] });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(bridge.snapshot.transfers).toEqual([]);
+    await bridge.call("disconnect_bridge");
+  });
+  it("keeps repeated native receive IDs separate and preserves a completed receive across send loss", async () => {
+    const { bridge, port } = await setup();
+    await sending(bridge, port);
+    const hash = await sha256(new TextEncoder().encode("abc"));
+    for (let n = 0; n < 2; n++) {
+      incoming(port);
+      port.emit({ event: "file_chunk", index: 0, offset: 0, data: "YWJj" });
+      port.emit({ event: "file_end", index: 0, bytes: 3, sha256: hash });
+      port.emit(ready);
+      await vi.waitFor(() =>
+        expect(
+          port.records.filter((r) => r.startsWith("COMMIT ")),
+        ).toHaveLength(n + 1),
+      );
+      port.emit({
+        event: "transfer_complete",
+        transfer_id: "TEST-1",
+        host_committed: true,
+        response_written: true,
+      });
+      await vi.waitFor(() =>
+        expect(
+          bridge.snapshot.transfers.filter(
+            (t) => t.direction === "receive" && t.state === "completed",
+          ),
+        ).toHaveLength(n + 1),
+      );
+    }
+    const received = bridge.snapshot.transfers.filter(
+      (t) => t.direction === "receive",
+    );
+    expect(new Set(received.map((t) => t.id)).size).toBe(2);
+    expect(new Set(received.map((t) => t.directory)).size).toBe(2);
+    expect(received.every((t) => t.native_id === "TEST-1")).toBe(true);
+    const downloaded: Blob[] = [];
+    vi.stubGlobal("document", {
+      createElement: () => ({ href: "", download: "", click() {} }),
+    });
+    vi.stubGlobal("URL", {
+      createObjectURL: (blob: Blob) => {
+        downloaded.push(blob);
+        return "blob:test";
+      },
+      revokeObjectURL: () => {},
+    });
+    vi.useFakeTimers();
+    for (const t of received) {
+      await bridge.call("open_receive_folder", { transferId: t.id });
+      expect(JSON.parse(await downloaded.at(-1)!.text()).directory).toBe(
+        t.directory,
+      );
+    }
+    await vi.advanceTimersByTimeAsync(1001);
+    vi.useRealTimers();
+    port.end();
+    await vi.waitFor(() => expect(bridge.snapshot.connection).toBe("error"));
+    expect(
+      bridge.snapshot.transfers
+        .filter((t) => t.direction === "receive")
+        .every((t) => t.state === "completed"),
+    ).toBe(true);
+    expect(
+      bridge.snapshot.transfers.find((t) => t.direction === "send")?.state,
+    ).toBe("uncertain");
+  });
+  it.each([
+    [-1, 5],
+    [2, 1],
+    [0.5, 1],
+    [1, 1.5],
+    [1, Number.MAX_SAFE_INTEGER + 1],
+  ])("rejects malformed byte progress %s/%s", async (done, total) => {
+    const { bridge, port } = await setup();
+    await sending(bridge, port);
+    port.emit({
+      event: "outgoing_progress",
+      wire_bytes: done,
+      wire_total: total,
+    });
+    await vi.waitFor(() => expect(bridge.snapshot.connection).toBe("error"));
+    expect(bridge.snapshot.transfers[0].state).toBe("uncertain");
+    expect(port.closed).toBe(true);
   });
 });
 

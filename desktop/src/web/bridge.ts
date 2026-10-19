@@ -90,12 +90,16 @@ export class WebBridge {
   }
   private incoming(id: unknown) {
     return this.snapshot.transfers.find(
-      (t) => t.direction === "receive" && t.id === id,
+      (t) =>
+        t.direction === "receive" &&
+        (t.native_id ?? t.id) === id &&
+        !terminal(t.state),
     );
   }
   private start(e: Event, send: boolean) {
     const transfer: Transfer = {
-      id: String(e.transfer_id),
+      id: send ? String(e.transfer_id) : crypto.randomUUID(),
+      native_id: String(e.transfer_id),
       name: String(e.name ?? "Incoming files"),
       direction: send ? "send" : "receive",
       peer: send ? String(e.peer) : null,
@@ -231,7 +235,9 @@ export class WebBridge {
         if (outgoing && !terminal(outgoing.state)) {
           check(
             typeof e.wire_bytes === "number" &&
+              Number.isSafeInteger(e.wire_bytes) &&
               typeof e.wire_total === "number" &&
+              Number.isSafeInteger(e.wire_total) &&
               e.wire_bytes >= 0 &&
               e.wire_bytes <= e.wire_total,
             "Invalid upload progress",
@@ -296,10 +302,10 @@ export class WebBridge {
         break;
       }
       case "received": {
-        this.receipts.set(String(e.transfer_id), e);
+        const t = this.incoming(e.transfer_id);
+        if (t) this.receipts.set(t.id, e);
         if (this.receipts.size > 100)
           this.receipts.delete(this.receipts.keys().next().value!);
-        const t = this.incoming(e.transfer_id);
         if (t) {
           t.state = "completed";
           t.done = t.bytes;
@@ -741,7 +747,8 @@ export class WebBridge {
       if (outcome.success !== true || outcome.http_status !== 200) {
         transfer.state = outcome.error === -125 ? "cancelled" : "failed";
         transfer.error = `Native AirDrop failed (error ${outcome.error}, HTTP ${outcome.http_status}); no automatic resend`;
-        this.snapshot.error = transfer.error;
+        if (transfer.state === "cancelled") transfer.error = null;
+        else this.snapshot.error = transfer.error;
         return;
       }
       check(
@@ -764,9 +771,13 @@ export class WebBridge {
             : !this.nativeStarted
               ? "failed"
               : "uncertain";
-        transfer.error = String(e);
+        transfer.error = transfer.state === "cancelled" ? null : String(e);
       }
-      this.snapshot.error = String(e);
+      if (
+        transfer?.state !== "cancelled" &&
+        this.snapshot.connection === "connected"
+      )
+        this.snapshot.error = String(e);
     } finally {
       if (transfer) transfer.updated = Date.now();
       this.operation = null;

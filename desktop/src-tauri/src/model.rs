@@ -36,6 +36,7 @@ pub struct Peer {
 #[derive(Clone, Serialize)]
 pub struct Transfer {
     pub id: String,
+    pub native_id: String,
     pub name: String,
     pub direction: String,
     pub peer: Option<String>,
@@ -95,9 +96,14 @@ impl Snapshot {
         })
     }
     fn incoming(&mut self, id: &str) -> Option<&mut Transfer> {
-        self.transfers
-            .iter_mut()
-            .find(|transfer| transfer.direction == "receive" && transfer.id == id)
+        self.transfers.iter_mut().find(|transfer| {
+            transfer.direction == "receive"
+                && transfer.native_id == id
+                && !matches!(
+                    transfer.state.as_str(),
+                    "completed" | "failed" | "cancelled" | "uncertain"
+                )
+        })
     }
     pub fn apply(&mut self, event: &Value) {
         self.revision += 1;
@@ -126,6 +132,8 @@ impl Snapshot {
                     "paired_peer":caps["paired_peer"], "usb_serial":event["usb_serial"],
                     "port":event["port"], "connected_at":time
                 }));
+                self.names.clear();
+                self.peers.clear();
                 self.can_resolve = event["capabilities"]["resolve"] == true;
                 self.connection = "connected".into();
                 self.error = None;
@@ -135,6 +143,7 @@ impl Snapshot {
             }
             "disconnected" => {
                 self.resolving_peer = None;
+                self.can_resolve = false;
                 self.connection = "disconnected".into();
                 self.peers.clear();
                 for transfer in &mut self.transfers {
@@ -221,7 +230,12 @@ impl Snapshot {
                 self.transfers.insert(
                     0,
                     Transfer {
-                        id: event["transfer_id"].as_str().unwrap_or("").into(),
+                        id: if send {
+                            event["transfer_id"].as_str().unwrap_or("").into()
+                        } else {
+                            uuid::Uuid::new_v4().to_string()
+                        },
+                        native_id: event["transfer_id"].as_str().unwrap_or("").into(),
                         name: event["name"].as_str().unwrap_or("Incoming files").into(),
                         direction: if send { "send" } else { "receive" }.into(),
                         peer: event["peer"].as_str().map(str::to_owned),
@@ -230,7 +244,9 @@ impl Snapshot {
                         done: 0,
                         progress_total: event["bytes"].as_u64().unwrap_or(0),
                         sha256: event["sha256"].as_str().map(str::to_owned),
-                        directory: None,
+                        directory: event["directory"]
+                            .as_str()
+                            .map(|path| display_path(Path::new(path))),
                         error: None,
                         updated: time,
                         started: time,
@@ -266,12 +282,16 @@ impl Snapshot {
             }
             "outgoing_stage" => {
                 if let Some(transfer) = self.outgoing() {
+                    let cancelling = transfer.state == "cancelling";
                     transfer.state = match event["stage"].as_str().unwrap_or("") {
                         "awaiting_acceptance" => "waiting",
                         "accepted" | "uploading" => "sending",
                         _ => "connecting",
                     }
                     .into();
+                    if cancelling {
+                        transfer.state = "cancelling".into();
+                    }
                     transfer.updated = time;
                     transfer.done = 0;
                     transfer.progress_total = 0;
@@ -282,7 +302,7 @@ impl Snapshot {
                     transfer.done = event["wire_bytes"].as_u64().unwrap_or(0);
                     transfer.progress_total = event["wire_total"].as_u64().unwrap_or(0);
                     transfer.updated = time;
-                    if transfer.done == transfer.progress_total {
+                    if transfer.done == transfer.progress_total && transfer.state != "cancelling" {
                         transfer.state = "finishing".into();
                     }
                 }
@@ -298,11 +318,13 @@ impl Snapshot {
                 }
             }
             "outgoing_complete" => {
-                if let Some(transfer) = self
-                    .transfers
-                    .iter_mut()
-                    .find(|transfer| transfer.id == event["transfer_id"].as_str().unwrap_or(""))
-                {
+                if let Some(transfer) = self.transfers.iter_mut().find(|transfer| {
+                    transfer.id == event["transfer_id"].as_str().unwrap_or("")
+                        && !matches!(
+                            transfer.state.as_str(),
+                            "completed" | "failed" | "cancelled" | "uncertain"
+                        )
+                }) {
                     transfer.state = if event["success"] == true && event["http_status"] == 200 {
                         "completed"
                     } else if event["error"] == -125 {
@@ -321,6 +343,25 @@ impl Snapshot {
                             event["error"], event["http_status"]
                         ));
                     }
+                }
+            }
+            "incoming_failed" => {
+                if let Some(transfer) = self.incoming(event["transfer_id"].as_str().unwrap_or("")) {
+                    transfer.state = if event["uncertain"] == true {
+                        "uncertain"
+                    } else {
+                        "failed"
+                    }
+                    .into();
+                    transfer.error = Some(format!(
+                        "{}: {}",
+                        event["phase"].as_str().unwrap_or("receive"),
+                        event["message"].as_str().unwrap_or("Receive failed")
+                    ));
+                    transfer.directory = event["directory"]
+                        .as_str()
+                        .map(|path| display_path(Path::new(path)));
+                    transfer.updated = time;
                 }
             }
             "incoming_verifying" => {
@@ -374,6 +415,39 @@ impl Snapshot {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn reused_receive_ids_keep_distinct_history_entries_and_paths() {
+        let mut state = Snapshot::new("inbox".into());
+        for directory in ["inbox/first", "inbox/second"] {
+            state.apply(&json!({"event":"incoming_started","transfer_id":"REUSED","bytes":0}));
+            state.apply(&json!({"event":"received","transfer_id":"REUSED","directory":directory,"files":[]}));
+        }
+        assert_ne!(state.transfers[0].id, state.transfers[1].id);
+        assert_eq!(state.transfers[0].native_id, state.transfers[1].native_id);
+        assert_ne!(state.transfers[0].directory, state.transfers[1].directory);
+    }
+    #[test]
+    fn cancellation_and_terminal_history_are_stable_under_late_events() {
+        let mut state = Snapshot::new("inbox".into());
+        state.apply(&json!({"event":"outgoing_started","transfer_id":"SEND","bytes":3}));
+        state.apply(&json!({"event":"cancellation_requested"}));
+        state.apply(&json!({"event":"outgoing_stage","stage":"uploading"}));
+        state.apply(&json!({"event":"outgoing_progress","wire_bytes":3,"wire_total":3}));
+        assert_eq!(state.transfers[0].state, "cancelling");
+        state.apply(&json!({"event":"outgoing_complete","transfer_id":"SEND","success":true,"http_status":200}));
+        assert_eq!(state.transfers[0].state, "completed");
+        state.apply(
+            &json!({"event":"outgoing_complete","transfer_id":"SEND","success":false,"error":-125}),
+        );
+        assert_eq!(state.transfers[0].state, "completed");
+        state.apply(&json!({"event":"incoming_started","transfer_id":"RECV","bytes":3}));
+        state.apply(&json!({"event":"incoming_failed","transfer_id":"RECV","message":"Disk failure","phase":"file_end","uncertain":false}));
+        state.apply(&json!({"event":"received","transfer_id":"RECV","files":[]}));
+        assert_eq!(state.transfers[0].state, "failed");
+        state.apply(&json!({"event":"disconnected"}));
+        assert_eq!(state.transfers[0].state, "failed");
+        assert!(!state.can_resolve);
+    }
     #[test]
     fn provenance_and_missing_values_are_preserved() {
         let mut state = Snapshot::new("inbox".into());
