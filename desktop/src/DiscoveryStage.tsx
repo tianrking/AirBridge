@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Radio } from "lucide-react";
+import { Info, Radio } from "lucide-react";
 import { PeerCard } from "./components";
 import type { Copy } from "./i18n";
 import {
@@ -19,6 +19,7 @@ export function DiscoveryStage({
   transfer,
   copy,
   onSelect,
+  onInspect,
 }: {
   peers: Peer[];
   connected: boolean;
@@ -27,6 +28,7 @@ export function DiscoveryStage({
   transfer?: Transfer;
   copy: Copy;
   onSelect: (peer: Peer) => void;
+  onInspect?: (peer: Peer) => void;
 }) {
   const [presented, setPresented] = useState<PresentedPeer[]>(() =>
     reconcilePresence([], connected ? peers : [], performance.now()),
@@ -142,6 +144,19 @@ export function DiscoveryStage({
                   data-peer={row.peer.mac}
                   aria-hidden={!available || undefined}
                 >
+                  {onInspect ? (
+                    <button
+                      className="peer-info icon-button"
+                      disabled={!available}
+                      aria-label={`${copy.deviceDetails}: ${row.peer.name ?? copy.appleDevice}`}
+                      title={copy.deviceDetails}
+                      onClick={() => {
+                        if (available) onInspect(row.peer);
+                      }}
+                    >
+                      <Info size={15} />
+                    </button>
+                  ) : null}
                   <PeerCard
                     peer={{ ...row.peer, advertised: available }}
                     selected={selected === row.peer.mac && available}

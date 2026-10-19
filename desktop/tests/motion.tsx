@@ -4,6 +4,7 @@ import { DiscoveryStage } from "../src/DiscoveryStage";
 import { translations } from "../src/i18n";
 import type { Language, Peer, Transfer } from "../src/types";
 import "../src/styles.css";
+import "../src/product.css";
 import "./motion.css";
 const demo = (last: string, name: string): Peer => ({
   mac: `02:00:00:00:00:${last}`,

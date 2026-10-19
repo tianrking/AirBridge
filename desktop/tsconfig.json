@@ -13,5 +13,11 @@
     "noUnusedParameters": true,
     "resolveJsonModule": true
   },
-  "include": ["src", "vite.config.ts", "tests/storage.ts", "tests/motion.tsx"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "tests/storage.ts",
+    "tests/motion.tsx",
+    "tests/product.tsx"
+  ]
 }

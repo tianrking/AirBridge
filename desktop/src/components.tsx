@@ -11,11 +11,19 @@ import {
   Smartphone,
   Tablet,
   MonitorSmartphone,
-  X,
+  ShieldCheck,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Dialog } from "./Dialog";
+import { CopyValue, DetailRow } from "./Details";
+import { progressOf, timeLabel, transferName } from "./presentation";
 import type { Copy } from "./i18n";
-import { formatBytes, terminal, type Peer, type Transfer } from "./types";
+import {
+  formatBytes,
+  terminal,
+  type Language,
+  type Peer,
+  type Transfer,
+} from "./types";
 export function PeerCard({
   peer,
   selected,
@@ -54,7 +62,7 @@ export function PeerCard({
       disabled={!peer.advertised || !peer.port}
       aria-pressed={selected}
       aria-label={`${copy.selectDevice}: ${deviceName}`}
-      title={`${copy.deviceDetails}: ${peer.mac} · ${peer.rssi} dBm`}
+      title={`${copy.deviceDetails}: ${peer.mac} · ${peer.rssi === null ? copy.unknownValue : `${peer.rssi} dBm`}`}
     >
       <span className={`peer-orbit ${transfer ? "has-progress" : ""}`}>
         <span className="peer-icon">
@@ -103,41 +111,41 @@ export function TransferRow({
   transfer,
   copy,
   onDetails,
+  language = "en",
 }: {
   transfer: Transfer;
   copy: Copy;
   onDetails: () => void;
+  language?: Language;
 }) {
   const completed = transfer.state === "completed";
-  const state = completed
-    ? transfer.direction === "send"
-      ? copy.sent
-      : copy.received
-    : (copy[transfer.state as keyof Copy] ?? transfer.state);
-  const progress =
-    transfer.progress_total > 0
-      ? Math.min(100, (transfer.done / transfer.progress_total) * 100)
-      : 0;
+  const state = transferState(transfer, copy);
+  const progress = progressOf(transfer);
   return (
     <button
-      className="transfer-row"
+      className={`transfer-row state-${transfer.state}`}
       onClick={onDetails}
-      aria-label={`${copy.details}: ${transfer.name}`}
+      aria-label={`${copy.details}: ${transferName(transfer, copy)}`}
     >
-      <span className="file-icon">
+      <span
+        className={`file-icon ${transfer.direction === "receive" ? "is-incoming" : ""}`}
+      >
         <File size={22} strokeWidth={1.5} />
       </span>
       <span className="transfer-content">
-        <strong>{transfer.name}</strong>
+        <strong>{transferName(transfer, copy)}</strong>
         <span className="transfer-meta">
           {transfer.direction === "send" ? (
             <ArrowUpRight size={13} />
           ) : (
             <ArrowDownLeft size={13} />
           )}
-          {formatBytes(transfer.bytes)}
+          {transfer.peer_name ??
+            (transfer.direction === "send"
+              ? (transfer.peer ?? copy.appleDevice)
+              : copy.senderUnknown)}
           <span>·</span>
-          {state}
+          {formatBytes(transfer.bytes)}
         </span>
         {!terminal(transfer.state) ? (
           <span
@@ -145,23 +153,50 @@ export function TransferRow({
             aria-label={state}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={transfer.progress_total ? progress : undefined}
-            className={`progress ${transfer.progress_total === 0 ? "indeterminate" : ""}`}
+            aria-valuenow={progress ?? undefined}
+            className={`progress ${progress === null ? "indeterminate" : ""}`}
           >
-            <span style={{ width: `${progress}%` }} />
+            <span style={{ width: `${progress ?? 0}%` }} />
           </span>
         ) : null}
       </span>
-      {completed ? (
-        <CheckCircle2 size={18} className="success-icon" />
-      ) : !terminal(transfer.state) ? (
-        <LoaderCircle size={17} className="spin muted" />
-      ) : (
-        <span className="status-dot" />
-      )}
-      <ChevronRight size={16} className="muted" />
+      <span className="transfer-outcome">
+        <span
+          className={
+            completed
+              ? "success-text"
+              : !terminal(transfer.state)
+                ? "active-text"
+                : "muted"
+          }
+        >
+          {completed ? (
+            <CheckCircle2 size={14} />
+          ) : !terminal(transfer.state) ? (
+            <LoaderCircle size={14} className="spin" />
+          ) : null}
+          {state}
+        </span>
+        <time
+          dateTime={
+            Number.isFinite(transfer.updated)
+              ? new Date(transfer.updated).toISOString()
+              : undefined
+          }
+        >
+          {timeLabel(transfer.updated, language, copy.unknownValue)}
+        </time>
+      </span>
+      <ChevronRight size={15} className="muted" />
     </button>
   );
+}
+function transferState(t: Transfer, copy: Copy): string {
+  return t.state === "completed"
+    ? t.direction === "send"
+      ? copy.sent
+      : copy.received
+    : (copy[t.state as keyof Copy] ?? t.state);
 }
 export function TransferDetails({
   transfer,
@@ -170,6 +205,8 @@ export function TransferDetails({
   onFolder,
   onCancel,
   folderLabel,
+  language = "en",
+  pending = false,
 }: {
   transfer: Transfer;
   copy: Copy;
@@ -177,103 +214,168 @@ export function TransferDetails({
   onFolder: () => void;
   onCancel: () => void;
   folderLabel?: string;
+  language?: Language;
+  pending?: boolean;
 }) {
-  const dialog = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement;
-    dialog.current?.querySelector("button")?.focus();
-    return () => {
-      if (previous instanceof HTMLElement) previous.focus();
-    };
-  }, []);
-  const state =
-    transfer.state === "completed"
-      ? transfer.direction === "send"
-        ? copy.sent
-        : copy.received
-      : (copy[transfer.state as keyof Copy] ?? transfer.state);
+  const state = transferState(transfer, copy);
+  const progress = progressOf(transfer);
+  const completed = transfer.state === "completed";
+  const progressLabel =
+    transfer.direction === "receive"
+      ? copy.receiveProgress
+      : transfer.state === "preparing"
+        ? copy.sourcePreparation
+        : copy.archiveProgress;
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <section
-        ref={dialog}
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="transfer-title"
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          if (event.key !== "Tab") return;
-          const items = dialog.current?.querySelectorAll<HTMLButtonElement>(
-            "button:not(:disabled)",
-          );
-          if (!items?.length) return;
-          const first = items[0];
-          const last = items[items.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }}
+    <Dialog
+      title={transferName(transfer, copy)}
+      eyebrow={copy.details}
+      icon={<File size={29} strokeWidth={1.4} />}
+      onClose={onClose}
+      copy={copy}
+    >
+      <p
+        className={`status-pill ${completed ? "is-success" : terminal(transfer.state) ? "is-muted" : "is-available"}`}
       >
-        <button
-          className="icon-button modal-close"
-          onClick={onClose}
-          aria-label={copy.close}
+        {completed ? (
+          <CheckCircle2 size={14} />
+        ) : !terminal(transfer.state) ? (
+          <LoaderCircle size={14} className="spin" />
+        ) : null}
+        {state}
+      </p>
+      {completed ? (
+        <div className="confirmation">
+          <ShieldCheck size={17} />
+          {transfer.direction === "send"
+            ? copy.nativeConfirmed
+            : copy.hashChecked}
+        </div>
+      ) : null}
+      {!terminal(transfer.state) ? (
+        <div className="detail-progress">
+          <div>
+            <span>{progressLabel}</span>
+            <strong>
+              {progress === null ? "—" : `${Math.floor(progress)}%`}
+            </strong>
+          </div>
+          <div
+            role="progressbar"
+            aria-label={progressLabel}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress ?? undefined}
+            className={`progress ${progress === null ? "indeterminate" : ""}`}
+          >
+            <span style={{ width: `${progress ?? 0}%` }} />
+          </div>
+        </div>
+      ) : null}
+      <dl className="detail-list">
+        <DetailRow label={copy.byteCount}>
+          {formatBytes(transfer.bytes)}{" "}
+          <span className="muted">
+            ({transfer.bytes.toLocaleString(language)} B)
+          </span>
+        </DetailRow>
+        <DetailRow
+          label={transfer.direction === "send" ? copy.recipient : copy.sender}
         >
-          <X size={20} />
-        </button>
-        <span className="large-file">
-          <File size={34} strokeWidth={1.3} />
-        </span>
-        <p className="eyebrow">{copy.details}</p>
-        <h2 id="transfer-title">{transfer.name}</h2>
-        <p className="muted">
-          {formatBytes(transfer.bytes)} · {state}
+          {transfer.peer_name ?? transfer.peer ?? copy.senderUnknown}
+        </DetailRow>
+        <DetailRow label={copy.startedAt}>
+          {timeLabel(transfer.started, language, copy.unknownValue)}
+        </DetailRow>
+        <DetailRow label={copy.updatedAt}>
+          {timeLabel(transfer.updated, language, copy.unknownValue)}
+        </DetailRow>
+      </dl>
+      {transfer.error ? (
+        <p className="detail-error" role="status">
+          {transfer.error}
         </p>
-        {transfer.state === "completed" ? (
-          <div className="confirmation">
-            <CheckCircle2 size={18} />
+      ) : null}
+      {transfer.direction === "receive" &&
+      completed &&
+      transfer.files?.length ? (
+        <section className="verified-list">
+          <h3>
+            <ShieldCheck size={15} />
+            {copy.verifiedFiles}
+          </h3>
+          {transfer.files.map((file) => (
+            <details key={file.name} className="verified-file">
+              <summary>
+                <span>
+                  {file.name}
+                  <small>
+                    {file.metadata
+                      ? copy.metadataFile
+                      : formatBytes(file.bytes)}
+                  </small>
+                </span>
+                <CheckCircle2 size={15} />
+              </summary>
+              <CopyValue value={file.sha256} copy={copy} />
+            </details>
+          ))}
+        </section>
+      ) : transfer.sha256 ? (
+        <div className="hash-block">
+          <label>
             {transfer.direction === "send"
-              ? copy.nativeConfirmed
-              : copy.hashChecked}
-          </div>
-        ) : null}
-        {transfer.sha256 ? (
-          <div className="hash-block">
-            <label>
-              {transfer.direction === "send"
-                ? copy.sourceHash
-                : copy.receivedHash}
-            </label>
-            <code>{transfer.sha256}</code>
-            <p>
-              {transfer.direction === "send"
-                ? copy.outcomeHint
-                : copy.incomingHint}
-            </p>
-          </div>
-        ) : null}
-        {transfer.error ? (
-          <p className="detail-error">{transfer.error}</p>
-        ) : null}
-        {transfer.directory ? (
-          <p className="folder-path">{transfer.directory}</p>
-        ) : null}
-        {transfer.directory && transfer.state === "completed" ? (
-          <button className="primary" onClick={onFolder}>
-            <FolderOpen size={17} />
+              ? copy.sourceHash
+              : copy.receivedHash}
+          </label>
+          <CopyValue value={transfer.sha256} copy={copy} />
+          <p>
+            {transfer.direction === "send"
+              ? copy.outcomeHint
+              : completed
+                ? copy.incomingHint
+                : copy.hashPending}
+          </p>
+        </div>
+      ) : null}
+      <details className="technical-details">
+        <summary>{copy.operationDetails}</summary>
+        <dl className="detail-list">
+          <DetailRow label={copy.transferId}>
+            <CopyValue value={transfer.id} copy={copy} />
+          </DetailRow>
+          {transfer.peer ? (
+            <DetailRow label={copy.awdlAddress}>
+              <CopyValue value={transfer.peer} copy={copy} />
+            </DetailRow>
+          ) : null}
+          {transfer.directory ? (
+            <DetailRow label={copy.receiveFolder}>
+              {transfer.directory}
+            </DetailRow>
+          ) : null}
+        </dl>
+      </details>
+      <div className="dialog-actions">
+        {transfer.directory && completed ? (
+          <button className="primary" onClick={onFolder} disabled={pending}>
+            <FolderOpen size={16} />
             {folderLabel ?? copy.openFolder}
           </button>
         ) : null}
         {transfer.direction === "send" && !terminal(transfer.state) ? (
-          <button className="secondary" onClick={onCancel}>
-            {copy.cancel}
+          <button
+            className="secondary"
+            onClick={onCancel}
+            disabled={pending || transfer.state === "cancelling"}
+          >
+            {transfer.state === "cancelling" ? (
+              <LoaderCircle size={15} className="spin" />
+            ) : null}
+            {transfer.state === "cancelling" ? copy.cancelling : copy.cancel}
           </button>
         ) : null}
-      </section>
-    </div>
+      </div>
+    </Dialog>
   );
 }

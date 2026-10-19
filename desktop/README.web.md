@@ -77,6 +77,19 @@ No hardware access is initiated on page load, and USB connection does not
 automatically issue a name query. A newly selected port always goes through the
 browser chooser; this build does not open every previously granted port.
 
+## Device and transfer details
+
+Open the **ⓘ** beside a device for its name source, temporary AWDL address,
+reported signal and protocol observations. Use **Bridge details** for validated
+handshake values. Missing readings are marked **Not reported**, and RSSI is not
+interpreted as physical distance.
+
+Activity supports direction/active filters, file/device search and metadata-only
+JSON export. Completed multi-file receipts retain each checked file and hash.
+Dialogs support keyboard navigation, Escape and focus restoration. See
+[product details and information provenance](../docs/product-details.md) for
+field sources, status semantics and the validation boundary.
+
 ## Checked receiving
 
 One serial reader handles both command replies and incoming records while a single

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { mergeSnapshot, type Snapshot } from "./types";
@@ -19,6 +19,7 @@ export function useBridge() {
   const [snapshot, setSnapshot] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const inFlight = useRef(new Set<string>());
   const native = isTauri();
   const unsupported = native ? null : supportIssue();
   useEffect(() => {
@@ -62,6 +63,8 @@ export function useBridge() {
       command: string,
       args?: Record<string, unknown>,
     ): Promise<T | undefined> => {
+      if (inFlight.current.has(command)) return;
+      inFlight.current.add(command);
       setError(null);
       setPending(true);
       try {
@@ -74,7 +77,8 @@ export function useBridge() {
         setError(String(reason));
         return;
       } finally {
-        setPending(false);
+        inFlight.current.delete(command);
+        setPending(inFlight.current.size > 0);
       }
     },
     [native],

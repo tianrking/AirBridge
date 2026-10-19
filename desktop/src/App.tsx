@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Activity,
+  Info,
   ArrowDownToLine,
   ArrowUpRight,
   Cable,
@@ -18,6 +19,9 @@ import {
   X,
 } from "lucide-react";
 import { TransferDetails, TransferRow } from "./components";
+import { ActivityPanel } from "./ActivityPanel";
+import { DeviceDetails, BridgeDetails } from "./Details";
+import { Dialog } from "./Dialog";
 import { DiscoveryStage } from "./DiscoveryStage";
 import { readLanguage, translations, webTranslations } from "./i18n";
 import {
@@ -25,6 +29,7 @@ import {
   terminal,
   type Language,
   type Page,
+  type Peer,
   type SelectedFile,
 } from "./types";
 import { useBridge } from "./useBridge";
@@ -37,6 +42,9 @@ export default function App() {
   const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [inspector, setInspector] = useState<
+    "bridge" | "disconnect" | Peer | null
+  >(null);
   const copy = translations[language];
   const webCopy = webTranslations[language];
   const connected = snapshot.connection === "connected";
@@ -57,14 +65,29 @@ export default function App() {
       /* Preference storage is optional. */
     }
   }, [language]);
-  useEffect(() => {
-    if (!detail) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDetailId(null);
-    };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [detail]);
+  const inspectedPeer =
+    typeof inspector === "object" && inspector
+      ? (snapshot.peers.find((peer) => peer.mac === inspector.mac) ?? {
+          ...inspector,
+          advertised: false,
+        })
+      : undefined;
+  const activeTransfer = snapshot.transfers.some(
+    (transfer) => !terminal(transfer.state),
+  );
+  function connectAction() {
+    if (connected && activeTransfer) {
+      setInspector("disconnect");
+      return;
+    }
+    void bridge.call(
+      connected
+        ? "disconnect_bridge"
+        : !bridge.native && !snapshot.receive_directory
+          ? "choose_receive_folder"
+          : "connect_bridge",
+    );
+  }
   async function chooseFile() {
     const file = await bridge.call<SelectedFile | null>("choose_file");
     if (file) setSelectedFile(file);
@@ -90,7 +113,7 @@ export default function App() {
           <img src={brand} alt="" />
           <span>AirBridge</span>
         </div>
-        <nav aria-label="Main navigation">
+        <nav aria-label={copy.navigation}>
           {(
             [
               { id: "share", label: copy.share, Icon: Send },
@@ -186,24 +209,23 @@ export default function App() {
                   <p>{connected ? copy.ready : copy.connectionHelp}</p>
                 </div>
                 <button
+                  className="icon-button bridge-info"
+                  aria-label={copy.connectionDetails}
+                  title={copy.connectionDetails}
+                  onClick={() => setInspector("bridge")}
+                >
+                  <Info size={17} />
+                </button>
+                <button
                   className={
                     connected ? "secondary compact" : "primary compact"
                   }
                   disabled={
                     bridge.pending ||
                     Boolean(bridge.unsupported) ||
-                    snapshot.connection === "connecting" ||
-                    Boolean(outgoing)
+                    snapshot.connection === "connecting"
                   }
-                  onClick={() =>
-                    void bridge.call(
-                      connected
-                        ? "disconnect_bridge"
-                        : !bridge.native && !snapshot.receive_directory
-                          ? "choose_receive_folder"
-                          : "connect_bridge",
-                    )
-                  }
+                  onClick={connectAction}
                 >
                   {snapshot.connection === "connecting" ? (
                     <LoaderCircle size={15} className="spin" />
@@ -224,6 +246,7 @@ export default function App() {
                 resolving={snapshot.resolving_peer}
                 transfer={outgoing}
                 copy={copy}
+                onInspect={setInspector}
                 onSelect={(peer) => {
                   setSelectedPeer(peer.mac);
                   if (
@@ -255,7 +278,7 @@ export default function App() {
                         </span>
                         <button
                           className="text-button"
-                          disabled={Boolean(outgoing)}
+                          disabled={bridge.pending || Boolean(outgoing)}
                           onClick={() => void chooseFile()}
                         >
                           {copy.chooseAnother}
@@ -281,6 +304,7 @@ export default function App() {
                     {selectedFile ? (
                       <button
                         className="icon-button remove-file"
+                        disabled={bridge.pending || Boolean(outgoing)}
                         aria-label={copy.remove}
                         onClick={() => setSelectedFile(null)}
                       >
@@ -310,7 +334,9 @@ export default function App() {
                   <span className="receive-symbol">
                     <ArrowDownToLine size={27} strokeWidth={1.3} />
                   </span>
-                  <h2>{connected ? copy.receiver : copy.receiverOffline}</h2>
+                  <h2>
+                    {connected ? copy.receiverLinked : copy.receiverOffline}
+                  </h2>
                   <p>{connected ? copy.receiverHelp : copy.connectionHelp}</p>
                   <div className="receive-identity">
                     <Laptop size={18} />
@@ -366,6 +392,7 @@ export default function App() {
                         key={transfer.id}
                         transfer={transfer}
                         copy={copy}
+                        language={language}
                         onDetails={() => setDetailId(transfer.id)}
                       />
                     ))
@@ -375,30 +402,12 @@ export default function App() {
               </section>
             </>
           ) : page === "activity" ? (
-            <section className="activity-panel">
-              <div className="section-heading">
-                <h2>{copy.today}</h2>
-                <span className="subtle-count">
-                  {snapshot.transfers.length}
-                </span>
-              </div>
-              {snapshot.transfers.length ? (
-                snapshot.transfers.map((transfer) => (
-                  <TransferRow
-                    key={transfer.id}
-                    transfer={transfer}
-                    copy={copy}
-                    onDetails={() => setDetailId(transfer.id)}
-                  />
-                ))
-              ) : (
-                <div className="empty-activity">
-                  <Activity size={38} strokeWidth={1} />
-                  <h2>{copy.emptyActivity}</h2>
-                  <p>{copy.emptyActivityHelp}</p>
-                </div>
-              )}
-            </section>
+            <ActivityPanel
+              transfers={snapshot.transfers}
+              language={language}
+              copy={copy}
+              onDetails={setDetailId}
+            />
           ) : (
             <div className="settings-stack">
               <section className="setting-card">
@@ -431,6 +440,7 @@ export default function App() {
                     {snapshot.receive_directory || webCopy.noFolder}
                   </p>
                   {connected ? <p>{copy.disconnectFolder}</p> : null}
+                  {!bridge.native ? <p>{copy.folderBrowserHint}</p> : null}
                 </div>
                 <button
                   className="secondary compact"
@@ -443,6 +453,22 @@ export default function App() {
                   }}
                 >
                   {copy.changeFolder}
+                </button>
+              </section>
+              <section className="setting-card">
+                <span className="setting-icon">
+                  <Cable size={21} />
+                </span>
+                <div className="setting-copy">
+                  <h2>{copy.connectionDetails}</h2>
+                  <p>{connected ? copy.ready : copy.disconnected}</p>
+                </div>
+                <button
+                  className="secondary compact"
+                  onClick={() => setInspector("bridge")}
+                >
+                  <Info size={14} />
+                  {copy.viewDetails}
                 </button>
               </section>
               <section className="about-card">
@@ -464,7 +490,7 @@ export default function App() {
                     <dt>{copy.transport}</dt>
                     <dd>
                       {bridge.native
-                        ? "USB Serial/JTAG · COM4"
+                        ? "USB Serial/JTAG"
                         : "Web Serial · USB Serial/JTAG"}
                     </dd>
                   </div>
@@ -486,10 +512,59 @@ export default function App() {
           </footer>
         </div>
       </main>
+      {inspector === "bridge" ? (
+        <BridgeDetails
+          snapshot={snapshot}
+          language={language}
+          native={bridge.native}
+          copy={copy}
+          onClose={() => setInspector(null)}
+        />
+      ) : inspector === "disconnect" ? (
+        <Dialog
+          title={copy.disconnectTitle}
+          icon={<Cable size={29} />}
+          copy={copy}
+          onClose={() => setInspector(null)}
+        >
+          <p className="dialog-description">{copy.disconnectHint}</p>
+          <div className="dialog-actions">
+            <button className="secondary" onClick={() => setInspector(null)}>
+              {copy.keepConnected}
+            </button>
+            <button
+              className="primary danger"
+              disabled={bridge.pending}
+              onClick={() => {
+                setInspector(null);
+                void bridge.call("disconnect_bridge");
+              }}
+            >
+              {copy.disconnectNow}
+            </button>
+          </div>
+        </Dialog>
+      ) : inspectedPeer ? (
+        <DeviceDetails
+          peer={inspectedPeer}
+          connected={connected}
+          canResolve={snapshot.can_resolve}
+          resolving={Boolean(snapshot.resolving_peer)}
+          pending={bridge.pending || Boolean(outgoing)}
+          language={language}
+          copy={copy}
+          onClose={() => setInspector(null)}
+          onResolve={() =>
+            void bridge.call("resolve_peer", { peer: inspectedPeer.mac })
+          }
+        />
+      ) : null}
       {detail ? (
         <TransferDetails
           transfer={detail}
           copy={copy}
+          language={language}
+          pending={bridge.pending}
           folderLabel={bridge.native ? copy.openFolder : webCopy.receipt}
           onClose={() => setDetailId(null)}
           onFolder={() =>

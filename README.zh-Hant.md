@@ -23,7 +23,7 @@ AirBridge 由 ESP32-S3 負責 Wi-Fi 與藍牙，透過序列埠連接 Windows。
 SHA256 校驗。瀏覽器介面、真實瀏覽器儲存與虛擬串口測試已通過；真實串口、
 使用者選擇的資料夾與原生 AirDrop 往返仍待驗收，不能沿用 CLI 的成功紀錄。
 
-[網頁操作與儲存設計](desktop/README.web.md) · [網頁驗收狀態](docs/web-qualification.md)
+[網頁操作與儲存設計](desktop/README.web.md) · [網頁驗收狀態](docs/web-qualification.md) · [介面細節與資料來源](docs/product-details.md)
 
 ## 桌面應用程式
 

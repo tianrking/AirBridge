@@ -585,6 +585,70 @@ describe("browser workflow state", () => {
     expect(bridge.snapshot.transfers[0].peer_name).toBe("Studio Mac");
     expect(bridge.snapshot.transfers[0].state).toBe("uncertain");
   });
+  it("retains every checked receipt file and waits for native confirmation", async () => {
+    const { bridge, port } = await connected();
+    const data = new TextEncoder().encode("abc"),
+      hash = await sha256(data);
+    port.emit({
+      event: "transfer_begin",
+      transfer_id: "MULTI-1",
+      files: 2,
+      total_bytes: 6,
+    });
+    for (const index of [0, 1])
+      port.emit({
+        event: "manifest_file",
+        index,
+        size: 3,
+        name_b64: encodedName(`part-${index}.bin`),
+      });
+    for (const index of [0, 1]) {
+      port.emit({
+        event: "file_begin",
+        index,
+        size: 3,
+        name_b64: encodedName(`part-${index}.bin`),
+        metadata: false,
+      });
+      port.emit({ event: "file_chunk", index, offset: 0, data: base64(data) });
+      port.emit({ event: "file_end", index, bytes: 3, sha256: hash });
+    }
+    port.emit({
+      event: "transfer_ready",
+      transfer_id: "MULTI-1",
+      files: 2,
+      total_bytes: 6,
+      nonce: "a".repeat(32),
+    });
+    await vi.waitFor(() =>
+      expect(bridge.snapshot.transfers[0]?.state).toBe("finishing"),
+    );
+    expect(bridge.snapshot.transfers[0]).toMatchObject({
+      name: "Incoming files",
+      file_count: 2,
+      done: 6,
+      sha256: null,
+    });
+    port.emit({
+      event: "transfer_complete",
+      transfer_id: "MULTI-1",
+      host_committed: true,
+      response_written: true,
+    });
+    await vi.waitFor(() =>
+      expect(bridge.snapshot.transfers[0].state).toBe("completed"),
+    );
+    expect(bridge.snapshot.transfers[0].files).toEqual(
+      [0, 1].map((index) => ({
+        name: `part-${index}.bin`,
+        bytes: 3,
+        sha256: hash,
+        metadata: false,
+      })),
+    );
+    expect(bridge.snapshot.transfers[0].sha256).toBe(null);
+    await bridge.call("disconnect_bridge");
+  });
   it("resolves real names without substituting DNS labels and expires stale advertisements", async () => {
     const { bridge, port } = await connected();
     expect(bridge.snapshot.peers[0].name).toBe(null);
