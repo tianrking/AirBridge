@@ -11,14 +11,14 @@ import {
   Globe2,
   Laptop,
   LoaderCircle,
-  Radio,
   Send,
   Settings2,
   ShieldCheck,
   Upload,
   X,
 } from "lucide-react";
-import { PeerCard, TransferDetails, TransferRow } from "./components";
+import { TransferDetails, TransferRow } from "./components";
+import { DiscoveryStage } from "./DiscoveryStage";
 import { readLanguage, translations, webTranslations } from "./i18n";
 import {
   formatBytes,
@@ -135,13 +135,10 @@ export default function App() {
             {connected ? copy.ready : copy.disconnected}
           </div>
         </header>
-        <div className="page-content">
+        <div className={`page-content ${page === "share" ? "share-page" : ""}`}>
           <div className="page-heading">
             <div>
-              <p className="eyebrow">
-                AIRBRIDGE /{" "}
-                {page === "share" ? "01" : page === "activity" ? "02" : "03"}
-              </p>
+              <p className="eyebrow">AirBridge</p>
               <h1>{title}</h1>
               <p>
                 {page === "share"
@@ -151,11 +148,6 @@ export default function App() {
                     : copy.preferencesHelp}
               </p>
             </div>
-            {page === "share" ? (
-              <span className="heading-icon">
-                <Radio size={28} strokeWidth={1.2} />
-              </span>
-            ) : null}
           </div>
           {error ? (
             <div className="error-banner" role="alert">
@@ -174,7 +166,7 @@ export default function App() {
               </button>
             </div>
           ) : null}
-          {!bridge.native ? (
+          {!bridge.native && (bridge.unsupported || page === "settings") ? (
             <div className="preview-note">
               <CircleHelp size={16} />
               {bridge.unsupported ?? webCopy.help}
@@ -225,58 +217,29 @@ export default function App() {
                         : copy.connect}
                 </button>
               </section>
-              <section className="devices-section">
-                <div className="section-heading">
-                  <h2>
-                    {copy.nearby}
-                    <span className="subtle-count">
-                      {peers.length.toString().padStart(2, "0")}
-                    </span>
-                  </h2>
-                  <span className="listening">
-                    <i className={`dot ${connected ? "blue pulse" : "gray"}`} />
-                    {connected ? copy.scanning : copy.selectDevice}
-                  </span>
-                </div>
-                {peers.length ? (
-                  <div className="peer-grid">
-                    {peers.map((peer) => (
-                      <PeerCard
-                        key={peer.mac}
-                        peer={peer}
-                        selected={selectedPeer === peer.mac}
-                        resolving={snapshot.resolving_peer === peer.mac}
-                        copy={copy}
-                        onSelect={() => {
-                          setSelectedPeer(peer.mac);
-                          if (
-                            !peer.name &&
-                            snapshot.can_resolve &&
-                            !snapshot.resolving_peer &&
-                            !outgoing
-                          )
-                            void bridge.call("resolve_peer", {
-                              peer: peer.mac,
-                            });
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="empty-devices">
-                    <span className="radar">
-                      <Radio size={28} strokeWidth={1.2} />
-                    </span>
-                    <strong>{copy.nearbyEmpty}</strong>
-                    <p>{copy.nearbyHelp}</p>
-                  </div>
-                )}
-              </section>
+              <DiscoveryStage
+                peers={peers}
+                connected={connected}
+                selected={selectedPeer}
+                resolving={snapshot.resolving_peer}
+                transfer={outgoing}
+                copy={copy}
+                onSelect={(peer) => {
+                  setSelectedPeer(peer.mac);
+                  if (
+                    !peer.name &&
+                    snapshot.can_resolve &&
+                    !snapshot.resolving_peer &&
+                    !outgoing
+                  )
+                    void bridge.call("resolve_peer", { peer: peer.mac });
+                }}
+              />
               <div className="share-columns">
                 <section className="file-panel">
                   <div className="section-heading">
                     <h2>{copy.yourFile}</h2>
-                    <span className="step">02</span>
+                    <File size={14} className="muted" aria-hidden="true" />
                   </div>
                   <div
                     className={`file-drop ${selectedFile ? "has-file" : ""}`}

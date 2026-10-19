@@ -9,6 +9,8 @@ import {
   Laptop,
   LoaderCircle,
   Smartphone,
+  Tablet,
+  MonitorSmartphone,
   X,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -20,15 +22,31 @@ export function PeerCard({
   onSelect,
   copy,
   resolving = false,
+  transfer,
 }: {
   peer: Peer;
   selected: boolean;
   onSelect: () => void;
   copy: Copy;
   resolving?: boolean;
+  transfer?: Transfer;
 }) {
   const deviceName = peer.name ?? copy.appleDevice;
-  const Icon = peer.name?.toLowerCase().includes("mac") ? Laptop : Smartphone;
+  const kind = peer.name?.toLowerCase() ?? "";
+  const Icon = kind.includes("mac")
+    ? Laptop
+    : kind.includes("ipad")
+      ? Tablet
+      : kind.includes("iphone")
+        ? Smartphone
+        : MonitorSmartphone;
+  const progress =
+    transfer && transfer.progress_total > 0
+      ? Math.min(
+          100,
+          Math.max(0, (100 * transfer.done) / transfer.progress_total),
+        )
+      : 0;
   return (
     <button
       className={`peer-card ${selected ? "selected" : ""}`}
@@ -38,8 +56,33 @@ export function PeerCard({
       aria-label={`${copy.selectDevice}: ${deviceName}`}
       title={`${copy.deviceDetails}: ${peer.mac} · ${peer.rssi} dBm`}
     >
-      <span className="peer-icon">
-        <Icon size={30} strokeWidth={1.5} />
+      <span className={`peer-orbit ${transfer ? "has-progress" : ""}`}>
+        <span className="peer-icon">
+          <Icon size={35} strokeWidth={1.35} />
+        </span>
+        {resolving ? (
+          <span className="peer-query-ring" aria-hidden="true" />
+        ) : null}
+        {transfer ? (
+          <svg
+            className={`peer-progress ${transfer.progress_total === 0 ? "indeterminate" : ""}`}
+            viewBox="0 0 112 112"
+            aria-hidden="true"
+          >
+            <circle
+              cx="56"
+              cy="56"
+              r="52"
+              pathLength="100"
+              strokeDasharray={`${transfer.progress_total === 0 ? 23 : progress} 100`}
+            />
+          </svg>
+        ) : null}
+        {selected ? (
+          <span className="peer-selected">
+            <Check size={12} strokeWidth={3} />
+          </span>
+        ) : null}
       </span>
       <span className="peer-name">{deviceName}</span>
       <span className="peer-subtitle">
@@ -51,13 +94,8 @@ export function PeerCard({
       </span>
       <span className="peer-foot">
         <i className="dot green" />
-        {peer.advertised ? copy.advertised : copy.scanning}
+        {peer.advertised ? copy.advertised : copy.deviceDeparted}
       </span>
-      {selected ? (
-        <span className="peer-selected">
-          <Check size={13} />
-        </span>
-      ) : null}
     </button>
   );
 }

@@ -135,6 +135,16 @@ The harness is not included in the production `dist/` bundle.
 See [web qualification](../docs/web-qualification.md) for measured results and
 the still-pending real COM4, user-selected directory and native AirDrop gates.
 
+## Discovery design and interaction
+
+The shared interface uses circular device avatars, a quiet discovery field,
+selection halos and smooth arrivals/departures. Lost peers become noninteractive
+immediately; their visual exit cannot make them valid recipients. Reduced-motion
+preferences are respected. A labeled, development-only interaction preview is
+available at `/tests/motion.html`; it uses synthetic devices and opens no serial
+port. See [discovery presentation](../docs/discovery-motion.md) for the state
+contract, preview capture and measured UI checks.
+
 ## 繁體中文快速操作
 
 以桌面 Chrome／Edge 開啟本機頁面，先選擇接收資料夾，再在瀏覽器選擇器中
