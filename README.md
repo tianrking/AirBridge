@@ -2,6 +2,10 @@
 
 # AirBridge
 
+[![CI](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml)
+
+[Automated browser checks and gated releases](docs/continuous-delivery.md) run on every push and pull request.
+
 **An experimental AirDrop bridge for Windows, powered by ESP32-S3.**
 
 [English](README.md) · [繁體中文](README.zh-Hant.md) · [Español](README.es.md)

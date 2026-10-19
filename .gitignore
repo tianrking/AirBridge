@@ -21,3 +21,5 @@ desktop/src-tauri/icons/ios/
 identity_credentials.hpp
 *.pem
 *.key
+desktop/test-results/
+desktop/playwright-report/

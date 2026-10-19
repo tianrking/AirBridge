@@ -1,0 +1,59 @@
+name: Release verified web
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/quality.yml
+
+  package:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: tested-web
+          path: desktop/dist
+      - name: Package exact tested artifact and verify manifest
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 scripts/package-web.py --tag "$RELEASE_TAG" --commit "$GITHUB_SHA" --output work/release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-web-release
+          path: work/release/*
+          if-no-files-found: error
+
+  publish:
+    needs: [checks, package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: verified-web-release
+          path: release
+      - name: Publish only after all gates passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cd release
+          sha256sum --check SHA256SUMS
+          gh release create "$RELEASE_TAG" --verify-tag --title "AirBridge $RELEASE_TAG" --notes-file RELEASE-NOTES.md AirBridge-web-*.zip SHA256SUMS

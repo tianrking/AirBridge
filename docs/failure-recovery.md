@@ -91,6 +91,10 @@ OPFS. This is not physical serial or AirDrop interoperability evidence.*
 
 ## Reproduce
 
+[GitHub Actions quality and release gates](continuous-delivery.md) run these
+checks on every push/PR, including headless Chromium failure flows and real OPFS
+readback. Install Python dependencies from `scripts/requirements-test.txt` first.
+
 ```powershell
 cd desktop
 npm ci
