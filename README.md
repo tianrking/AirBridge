@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml)
 
-[Automated browser checks and gated releases](docs/continuous-delivery.md) run on every push and pull request.
+CI runs on every push and pull request; [version-tag releases require the same checks](docs/continuous-delivery.md).
 
 **An experimental AirDrop bridge for Windows, powered by ESP32-S3.**
 

@@ -2,6 +2,10 @@
 
 # AirBridge
 
+[![CI](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml)
+
+每次推送與 PR 都會自動執行測試；[版本標籤發布必須通過同一套檢查](docs/continuous-delivery.md)。
+
 **以 ESP32-S3 為核心，讓 Windows 接入 AirDrop 的實驗性橋接專案。**
 
 [English](README.md) · [繁體中文](README.zh-Hant.md) · [Español](README.es.md)

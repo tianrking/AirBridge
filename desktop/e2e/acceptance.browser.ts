@@ -1,21 +1,8 @@
-import { test, expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { test, expect } from "./test";
 
 // These are real browser/storage tests. Only serial and native protocol input
 // are synthetic; no hardware chooser or radio interface is opened.
-test.beforeEach(async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  Object.assign(page, { acceptanceErrors: errors });
-});
-test.afterEach(async ({ page }) => {
-  expect(
-    (page as Page & { acceptanceErrors: string[] }).acceptanceErrors,
-  ).toEqual([]);
-});
-
 async function runHarness(page: Page, path: string) {
   await page.goto(path);
   await page.locator("#run").click();
@@ -32,12 +19,10 @@ async function runHarness(page: Page, path: string) {
     )
     .toMatch(/^(passed|failed)$/);
   const result = JSON.parse(await page.locator("#result").innerText());
-  await test
-    .info()
-    .attach("acceptance-result", {
-      body: JSON.stringify(result, null, 2),
-      contentType: "application/json",
-    });
+  await test.info().attach("acceptance-result", {
+    body: JSON.stringify(result, null, 2),
+    contentType: "application/json",
+  });
   expect(result, JSON.stringify(result)).toHaveProperty("status", "passed");
   return result;
 }

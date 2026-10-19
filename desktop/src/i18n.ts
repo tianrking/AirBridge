@@ -23,6 +23,9 @@ export const webTranslations: Record<
   },
 };
 const en = {
+  pauseSignal: "Pause signal animation",
+  resumeSignal: "Resume signal animation",
+  motionReduced: "Animation reduced by system preference",
   disconnecting: "Disconnecting",
   recovering: "Releasing connection",
   cleanup_failed: "Port release unconfirmed",
@@ -209,6 +212,9 @@ const en = {
 } as const;
 export type Copy = { [Key in keyof typeof en]: string };
 const zh: Copy = {
+  pauseSignal: "暫停訊號動畫",
+  resumeSignal: "繼續訊號動畫",
+  motionReduced: "依系統偏好減少動態效果",
   disconnecting: "正在中斷",
   recovering: "正在釋放連線",
   cleanup_failed: "尚未確認序列埠已釋放",
@@ -383,6 +389,9 @@ const zh: Copy = {
   receivingAuto: "開發韌體目前會自動接受已設定 Apple 對端的檔案。",
 };
 const es: Copy = {
+  pauseSignal: "Pausar animación de señal",
+  resumeSignal: "Reanudar animación de señal",
+  motionReduced: "Animación reducida según la preferencia del sistema",
   disconnecting: "Desconectando",
   recovering: "Liberando conexión",
   cleanup_failed: "Liberación del puerto sin confirmar",

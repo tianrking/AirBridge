@@ -268,6 +268,7 @@ export function BridgeApp({
                 selected={selectedPeer}
                 resolving={snapshot.resolving_peer}
                 transfer={outgoing}
+                transferring={activeTransfer}
                 copy={copy}
                 onInspect={setInspector}
                 onSelect={(peer) => {

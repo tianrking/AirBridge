@@ -25,6 +25,16 @@ Reports are retained for 14 days. OPFS is isolated in a fresh disposable browser
 context; tests never select a physical serial port or request a Windows folder.
 These checks do not replace the [physical/native acceptance gates](web-qualification.md).
 
+The motion checks also exercise expanding waves, transfer tempo, disconnect,
+pause/resume, keyboard controls, runtime reduced motion, three-language labels,
+device disappearance and a 390px layout. Visibility-event injection checks
+background pause logic; actual OS suspension remains a hardware-session check.
+
+First hosted acceptance: [CI run 39235593497](https://github.com/tianrking/AirBridge/actions/runs/39235593497)
+passed all three jobs for `02dfedd`. It ran 83 frontend unit tests, the initial
+three browser tests, 26 Python tests, 19 Rust tests and 346 C++ protocol checks.
+The current motion extension brings the browser suite to seven tests.
+
 ## Release behavior
 
 Push a version tag such as `v0.4.0` **only when intentionally publishing a release**.

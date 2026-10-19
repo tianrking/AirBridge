@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Info, Radio } from "lucide-react";
+import { Info, Pause, Play, Radio } from "lucide-react";
 import { PeerCard } from "./components";
 import type { Copy } from "./i18n";
 import {
@@ -7,7 +7,7 @@ import {
   reconcilePresence,
   type PresentedPeer,
 } from "./presence";
-import type { Peer, Transfer } from "./types";
+import { terminal, type Peer, type Transfer } from "./types";
 import brand from "./brand.svg";
 import "./discovery.css";
 
@@ -17,6 +17,7 @@ export function DiscoveryStage({
   selected,
   resolving,
   transfer,
+  transferring = false,
   copy,
   onSelect,
   onInspect,
@@ -26,6 +27,7 @@ export function DiscoveryStage({
   selected: string | null;
   resolving: string | null;
   transfer?: Transfer;
+  transferring?: boolean;
   copy: Copy;
   onSelect: (peer: Peer) => void;
   onInspect?: (peer: Peer) => void;
@@ -36,6 +38,8 @@ export function DiscoveryStage({
   const [reduced, setReduced] = useState(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
+  const [motionPaused, setMotionPaused] = useState(false);
+  const [hidden, setHidden] = useState(() => document.hidden);
   const grid = useRef<HTMLDivElement>(null);
   const positions = useRef(new Map<string, { x: number; y: number }>());
   useEffect(() => {
@@ -43,6 +47,11 @@ export function DiscoveryStage({
     const update = () => setReduced(query.matches);
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    const update = () => setHidden(document.hidden);
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
   }, []);
   // Reconcile before paint so a new advertisement does not flash the empty state.
   useLayoutEffect(() => {
@@ -110,9 +119,30 @@ export function DiscoveryStage({
   const live = new Set(
     connected ? peers.filter((p) => p.advertised).map((p) => p.mac) : [],
   );
+  const activeTransfer =
+    connected && (transferring || (transfer && !terminal(transfer.state)));
+  const signal = !connected
+    ? "idle"
+    : activeTransfer
+      ? "transferring"
+      : "listening";
+  const motion = reduced
+    ? "reduced"
+    : motionPaused
+      ? "paused"
+      : hidden
+        ? "hidden"
+        : "running";
+  const motionLabel = reduced
+    ? copy.motionReduced
+    : motionPaused
+      ? copy.resumeSignal
+      : copy.pauseSignal;
   return (
     <section
-      className={`discovery-stage ${connected ? "is-listening" : "is-idle"}`}
+      className={`discovery-stage ${connected ? "is-listening" : "is-idle"} ${activeTransfer ? "is-transferring" : ""}`}
+      data-signal={signal}
+      data-motion={motion}
       aria-label={copy.nearby}
     >
       <div className="discovery-header">
@@ -121,13 +151,32 @@ export function DiscoveryStage({
           <h2>{copy.nearby}</h2>
           <span className="device-count">{count}</span>
         </div>
-        <span className="discovery-status">
-          <i className={`dot ${connected ? "blue" : "gray"}`} />
-          {connected ? copy.scanning : copy.discoveryIdle}
-        </span>
+        <div className="discovery-actions">
+          <span className="discovery-status">
+            <i className={`dot ${connected ? "blue" : "gray"}`} />
+            {connected ? copy.scanning : copy.discoveryIdle}
+          </span>
+          <button
+            type="button"
+            className="signal-toggle"
+            aria-label={motionLabel}
+            title={motionLabel}
+            aria-pressed={motionPaused || reduced}
+            disabled={!connected || reduced}
+            onClick={() => setMotionPaused((previous) => !previous)}
+          >
+            {motionPaused || reduced ? <Play size={13} /> : <Pause size={13} />}
+          </button>
+        </div>
       </div>
       <div className="discovery-space">
         <div className="discovery-rings" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="signal-waves" aria-hidden="true">
           <span />
           <span />
           <span />

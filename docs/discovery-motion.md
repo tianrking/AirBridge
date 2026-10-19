@@ -47,7 +47,35 @@ entry point. The main application has no demo devices or demo-mode switch.
 *Browser capture of the labeled synthetic interaction page. This is visual and
 interaction evidence, not nearby-device discovery or AirDrop transfer evidence.*
 
-## Verification — 2026-10-19
+## Propagating signal waves
+
+The current surface adds four staggered expanding waves, centered on the bridge
+glyph, with a 6.4-second cycle while connected and 4.8 seconds during an active
+transfer. These are **state illustrations**, not RSSI measurements, packet counts,
+distance estimates or evidence of delivery. Disconnection removes them entirely.
+No JavaScript frame loop or synthetic RF events drive this decoration.
+
+The header pause/resume button supports pointer and keyboard input, with English,
+Traditional Chinese and Spanish labels. Pausing affects the decorative signal
+waves without interrupting discovery or files. Hidden tabs pause the waves;
+system reduced motion removes them and disables the animation control. Static
+status text and actual progress remain available in every mode.
+
+![Signal wave interaction preview](images/signal-waves-preview.png)
+
+*Actual browser capture of the labeled synthetic interaction page. The live page
+animates; this still image does not demonstrate radio activity.*
+
+Playwright now verifies changing computed transforms, pause/resume stability,
+transfer tempo, disconnect retirement, runtime reduced-motion changes, keyboard
+activation, translated controls, immediate departure ineligibility and a 390px
+layout. These tests run in [GitHub Actions](continuous-delivery.md) together with
+browser failure/storage acceptance. The local run passed 83 unit checks and all
+seven browser tests (one test includes six failure scenarios). Background pause
+is checked by injected visibility events; this does not qualify OS suspension.
+No hardware was used.
+
+## Earlier verification — 2026-10-19
 
 - 27 frontend tests passed: the existing 23 cases plus four presence-model cases.
 - Production TypeScript/Vite build passed without new dependencies.

@@ -2,6 +2,10 @@
 
 # AirBridge
 
+[![CI](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml/badge.svg)](https://github.com/tianrking/AirBridge/actions/workflows/ci.yml)
+
+Cada push y PR ejecuta las pruebas; [las versiones etiquetadas requieren los mismos controles](docs/continuous-delivery.md).
+
 **Un puente experimental de AirDrop para Windows basado en ESP32-S3.**
 
 [English](README.md) · [繁體中文](README.zh-Hant.md) · [Español](README.es.md)

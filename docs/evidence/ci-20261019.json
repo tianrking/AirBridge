@@ -1,0 +1,22 @@
+{
+  "source_commit": "02dfedd63eb24f9898af447a5d6799f12cf4794f",
+  "url": "https://github.com/tianrking/AirBridge/actions/runs/39235593497",
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "name": "checks / Protocol and Windows host",
+      "conclusion": "success"
+    },
+    {
+      "name": "checks / Web and Chromium acceptance",
+      "conclusion": "success"
+    },
+    {
+      "name": "checks / Quality gate",
+      "conclusion": "success"
+    }
+  ],
+  "hardware_tested": false,
+  "native_airdrop_tested": false
+}
