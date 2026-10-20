@@ -1,3 +1,4 @@
+import { assertHostAvailable } from "./serial-owner";
 import {
   terminal,
   type SelectedFile,
@@ -545,7 +546,10 @@ export class WebBridge {
     );
     return peer;
   }
+  canInstallFirmware = () =>
+    !this.connecting && !this.session && !this.cleanup && !this.operation;
   private connect() {
+    assertHostAvailable();
     check(
       !this.connecting && !this.cleanup && !this.session && !this.operation,
       "Disconnect and finish port cleanup before reconnecting",
@@ -565,7 +569,7 @@ export class WebBridge {
       this.directory,
       "Choose a receive folder before connecting (the button is in Receive or Settings)",
     );
-    const api = (navigator as Navigator & { serial: SerialAPI }).serial;
+    const api = (navigator as unknown as { serial: SerialAPI }).serial;
     // Must remain in the initiating click's user-activation scope.
     const port = await api.requestPort({
       filters: [{ usbVendorId: 0x303a, usbProductId: 0x1001 }],

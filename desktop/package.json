@@ -9,10 +9,14 @@
     "build": "tsc -b && vite build",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "prebuild": "node scripts/verify-firmware.mjs",
+    "predev": "node scripts/verify-firmware.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
+    "esptool-js": "0.7.0",
+    "js-md5": "0.9.2",
     "lucide-react": "^0.468",
     "react": "^19",
     "react-dom": "^19"
@@ -23,6 +27,7 @@
     "@types/node": "^24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/w3c-web-serial": "1.0.8",
     "@vitejs/plugin-react": "^5",
     "prettier": "^3.9.10",
     "typescript": "^5.9",

@@ -15,6 +15,11 @@ class PagesArtifact(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.site = Path(self.temp.name)
+        for part in pages.CATALOG['segments']:
+            name = 'firmware/v' + pages.CATALOG['version'] + '/' + part['path']
+            destination = self.site / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes((ROOT / 'desktop/public' / name).read_bytes())
         (self.site / 'assets').mkdir()
         (self.site / 'assets/app.js').write_text('checked')
         (self.site / 'index.html').write_text('<script src="./assets/app.js"></script>')
@@ -38,4 +43,18 @@ class PagesArtifact(unittest.TestCase):
         (self.site / 'index.html').write_text('<script src="./assets/app.js"></script>')
         (self.site / 'private.txt').write_text('must not publish')
         with self.assertRaises(ValueError):
+            self.prepare()
+
+    def test_firmware_corruption_missing_segment_and_extra_file_block_deployment(self):
+        image = self.site / 'firmware/v0.0.1/bootloader.bin'
+        original = image.read_bytes()
+        image.write_bytes(b'corrupt')
+        with self.assertRaisesRegex(ValueError, 'Pinned firmware mismatch'):
+            self.prepare()
+        image.unlink()
+        with self.assertRaisesRegex(ValueError, 'Pinned firmware missing'):
+            self.prepare()
+        image.write_bytes(original)
+        (image.parent / 'private.bin').write_bytes(b'must not publish')
+        with self.assertRaisesRegex(ValueError, 'Unexpected production file'):
             self.prepare()

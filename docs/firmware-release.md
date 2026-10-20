@@ -14,7 +14,7 @@ python flash.py --port COM7
 
 Replace `COM7` with **your board's** native USB port (for example `/dev/ttyACM0` on Linux). The helper never enumerates or automatically selects a device. It verifies every packaged file before opening the explicitly chosen port, then asks you to type `FLASH`. Close all applications using that port first. If the board cannot enter its bootloader automatically, use its BOOT/RESET sequence according to the board's documentation.
 
-The image writes the bootloader at `0x0`, partition table at `0x8000`, and application at `0x10000`, with DIO / 80 MHz / 16 MiB flash settings. It replaces existing firmware. It does not perform a whole-chip erase or overwrite the NVS partition. Never flash it to a board with a different memory configuration. `BUILD.json` records the profile and `MANIFEST.json` records each file's size and SHA256; compare the downloaded ZIP with the release's `SHA256SUMS` too.
+The image writes the bootloader at `0x0`, partition table at `0x8000`, and application at `0x10000`, with DIO / 80 MHz / 16 MiB flash settings. It replaces existing firmware. The current helper writes three separate segments without a whole-chip erase, preserving NVS. The immutable v0.0.1 archive helper instead writes a merged image whose padding crosses NVS: use the [browser installer](https://w0x7ce.eu/AirBridge/) or explicitly write the raw segments when preservation matters. Never flash it to a board with a different memory configuration. `BUILD.json` records the profile and `MANIFEST.json` records each file's size and SHA256; compare the downloaded ZIP with the release's `SHA256SUMS` too.
 
 ## Connect and share
 
@@ -33,3 +33,5 @@ Each board generates its own P-256 private key and self-signed TLS certificate a
 ESP-IDF **v6.1** is pinned in CI. Previous development hardware verified Mac discovery and native binary transfers, including SHA256-matched roundtrips. **This new public profile, runtime authorization and first-boot identity have build/automated coverage, but have not yet been physically requalified.** Browser Web Serial native AirDrop acceptance also remains pending. CI does not connect a board, operate an Apple device or prove RF compatibility. This is an experimental prerelease; iPhone interoperability, Contacts Only, folder transfers, large files and long-duration reliability are unqualified.
 
 Protocol research acknowledges [omdrop-owl](https://github.com/t4t5/omdrop-owl), Linux OWL and OpenDrop. AirBridge is an independent project and is not affiliated with Apple.
+
+Browser installation and detailed recovery: [Browser firmware installation](browser-flashing.md).

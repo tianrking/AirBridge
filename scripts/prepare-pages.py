@@ -7,6 +7,9 @@ from pathlib import Path
 import re
 
 
+CATALOG = json.loads((Path(__file__).resolve().parents[1] /
+                      'desktop/src/web/firmware-release.json').read_text())
+
 def prepare(site, commit, run_url):
     if not re.fullmatch(r'[0-9a-f]{40}', commit):
         raise ValueError('Full source SHA required')
@@ -24,14 +27,23 @@ def prepare(site, commit, run_url):
     if any(path.is_symlink() for path in paths):
         raise ValueError('Symlinks cannot be published')
     records = {}
+    firmware = {
+        'firmware/v' + CATALOG['version'] + '/' + part['path']: {
+            'bytes': part['bytes'], 'sha256': part['sha256']}
+        for part in CATALOG['segments']}
     for path in paths:
         if not path.is_file():
             continue
         name = path.relative_to(site).as_posix()
-        if not (name == 'index.html' or name.startswith('assets/')):
+        if not (name == 'index.html' or name.startswith('assets/') or name in firmware):
             raise ValueError('Unexpected production file: ' + name)
         data = path.read_bytes()
-        records[name] = {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+        record = {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+        if name in firmware and record != firmware[name]:
+            raise ValueError('Pinned firmware mismatch: ' + name)
+        records[name] = record
+    if not set(firmware).issubset(records):
+        raise ValueError('Pinned firmware missing from web build')
     metadata = {'commit': commit, 'workflow': run_url,
                 'prepared_at': datetime.now(timezone.utc).isoformat(),
                 'hardware_tested_by_ci': False, 'files': records}

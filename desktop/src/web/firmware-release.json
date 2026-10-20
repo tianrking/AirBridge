@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "commit": "704bfd2c4498b8411555f4232c604a4bf12cec53",
+  "release": "https://github.com/tianrking/AirBridge/releases/tag/v0.0.1",
+  "archive_sha256": "be0a63ca858d03b2a6c6155a4ca8e9d5790fc4c088dd5ca66c7745438554aeef",
+  "chip": "ESP32-S3",
+  "flash_bytes": 16777216,
+  "psram": "8 MB octal",
+  "segments": [
+    {
+      "path": "bootloader.bin",
+      "address": 0,
+      "bytes": 21104,
+      "sha256": "e168deaab4c71add7c89aa20bf3f16c50ff29949a1fa0624587fc8d422716231"
+    },
+    {
+      "path": "partition-table.bin",
+      "address": 32768,
+      "bytes": 3072,
+      "sha256": "5e71c3c890e04714daa03b21a0d23953a2dadf9fdf15eec02b886f7b6e9f8c81"
+    },
+    {
+      "path": "airbridge_native.bin",
+      "address": 65536,
+      "bytes": 1002448,
+      "sha256": "0b11087d1b0292b342f6821044e05aeedbae40d6b9ce8a80beff92acb0d97385"
+    }
+  ]
+}

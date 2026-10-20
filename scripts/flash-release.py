@@ -40,4 +40,6 @@ if __name__ == '__main__':
         sys.exit('Cancelled; no device was opened')
     subprocess.run([sys.executable, '-m', 'esptool', '--chip', 'esp32s3', '--port', args.port,
                     '--baud', '460800', 'write-flash', '--flash-mode', 'dio', '--flash-size', '16MB',
-                    '--flash-freq', '80m', '0x0', str(root / 'AirBridge-esp32s3.bin')], check=True)
+                    '--flash-freq', '80m', '0x0', str(root / 'bootloader/bootloader.bin'),
+                    '0x8000', str(root / 'partition_table/partition-table.bin'),
+                    '0x10000', str(root / 'airbridge_native.bin')], check=True)

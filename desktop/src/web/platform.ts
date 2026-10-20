@@ -63,7 +63,7 @@ export function supportCode(features: {
   if (!features.storage) return "storage";
   return null;
 }
-export function browserSupport(): SupportCode | null {
+export function browserSupport(serialOnly = false): SupportCode | null {
   const doc =
     typeof document === "undefined"
       ? undefined
@@ -77,10 +77,12 @@ export function browserSupport(): SupportCode | null {
     embedded: window.self !== window.top,
     policy: policy?.allowsFeature("serial") ?? true,
     serial: !!(navigator as Navigator & { serial?: SerialAPI }).serial,
-    storage: !!(
-      (window as BrowserPlatform).showDirectoryPicker &&
-      (window as BrowserPlatform).showOpenFilePicker
-    ),
+    storage:
+      serialOnly ||
+      !!(
+        (window as BrowserPlatform).showDirectoryPicker &&
+        (window as BrowserPlatform).showOpenFilePicker
+      ),
   });
 }
 const issues: Record<SupportCode, string> = {
