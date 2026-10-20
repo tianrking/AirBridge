@@ -1024,3 +1024,107 @@ footer {
     display: none;
   }
 }
+
+/* Firmware installation shares the application's spacing, focus and theme tokens. */
+.firmware-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0 1.2rem;
+}
+.firmware-setup {
+  display: grid;
+  gap: 1rem;
+  max-width: 100%;
+  line-height: 1.6;
+}
+.firmware-setup p {
+  margin: 0;
+}
+.firmware-profile {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 16px;
+}
+.firmware-profile svg {
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+.firmware-status {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-block: 0.5rem;
+}
+.firmware-status.verified {
+  color: var(--accent, #148465);
+}
+.firmware-warning {
+  padding: 0.85rem;
+  border-inline-start: 3px solid #d28b28;
+  background: #d28b2812;
+  border-radius: 8px;
+}
+.firmware-warning code {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 0.75rem;
+  opacity: 0.75;
+  margin-top: 0.5rem;
+}
+.firmware-consent {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.firmware-consent input {
+  margin-top: 0.4rem;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+.firmware-board {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.8rem;
+  border-radius: 12px;
+  background: #8888880e;
+}
+.firmware-board div {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+.firmware-board dd {
+  margin: 0;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+.firmware-board dt {
+  opacity: 0.65;
+}
+.firmware-setup progress {
+  width: 100%;
+  height: 10px;
+  accent-color: var(--accent, #4279ef);
+}
+.firmware-recovery,
+.firmware-provenance {
+  font-size: 0.78rem;
+  opacity: 0.78;
+}
+.firmware-actions {
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .firmware-setup * {
+    animation: none !important;
+  }
+}

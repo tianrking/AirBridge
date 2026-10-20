@@ -65,6 +65,17 @@ describe("Espressif adapter contract (mock ROM)", () => {
     await device.close();
     expect(fake.close).toHaveBeenCalledOnce();
   });
+  it("reports the library's own flash digest mismatch as verification failure", async () => {
+    fake.write.mockRejectedValueOnce(
+      Error("MD5 of file does not match data in flash!"),
+    );
+    const device = await espDevice({});
+    await device.inspect();
+    await expect(
+      device.write([{ address: 0, data: new Uint8Array(4) }], () => {}),
+    ).rejects.toMatchObject({ code: "verify" });
+    await device.close();
+  });
   for (const kind of [
     "SECURE_BOOT_EN",
     "SECURE_DOWNLOAD_ENABLE",

@@ -227,10 +227,18 @@ describe("browser firmware installation (virtual device, no hardware)", () => {
     expect(assertHostAvailable).not.toThrow();
   });
   it("a failed final release cannot auto-retry and masquerade as a clean installation", async () => {
-    const close = vi.fn().mockRejectedValueOnce(Error("locked")).mockResolvedValue(undefined);
-    const f = await ready({ close }); await f.installer.install(true);
-    expect(close).toHaveBeenCalledTimes(1); expect(f.installer.getSnapshot().phase).toBe("cleanup_failed"); expect(assertHostAvailable).toThrow();
-    await f.installer.retryRelease(); expect(f.installer.getSnapshot().phase).toBe("cancelled"); expect(assertHostAvailable).not.toThrow();
+    const close = vi
+      .fn()
+      .mockRejectedValueOnce(Error("locked"))
+      .mockResolvedValue(undefined);
+    const f = await ready({ close });
+    await f.installer.install(true);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(f.installer.getSnapshot().phase).toBe("cleanup_failed");
+    expect(assertHostAvailable).toThrow();
+    await f.installer.retryRelease();
+    expect(f.installer.getSnapshot().phase).toBe("cancelled");
+    expect(assertHostAvailable).not.toThrow();
   });
   it("timeout retains the pending close instead of overlapping cleanup", async () => {
     let finish!: () => void;

@@ -9,6 +9,7 @@ export function Dialog({
   children,
   onClose,
   copy,
+  dismissible = true,
 }: {
   title: string;
   eyebrow?: string;
@@ -16,6 +17,7 @@ export function Dialog({
   children: ReactNode;
   onClose: () => void;
   copy: Copy;
+  dismissible?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useId();
@@ -62,7 +64,7 @@ export function Dialog({
       }}
       onCancel={(event) => {
         event.preventDefault();
-        close.current();
+        if (dismissible) close.current();
       }}
       onClick={(event) => {
         if (event.target !== event.currentTarget) return;
@@ -73,12 +75,13 @@ export function Dialog({
           event.clientY < rect.top ||
           event.clientY > rect.bottom
         )
-          close.current();
+          if (dismissible) close.current();
       }}
     >
       <button
         type="button"
         className="icon-button dialog-close"
+        disabled={!dismissible}
         onClick={onClose}
         aria-label={copy.close}
       >

@@ -1,6 +1,9 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useDemoBridge } from "./demo";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { FirmwareSetup } from "./FirmwareSetup";
+import { firmwareInstaller } from "./web/firmware-installer";
+import { ownsFlash } from "./web/flasher";
 import {
   Activity,
   Info,
@@ -96,6 +99,11 @@ export function BridgeApp({
       }
     : baseCopy;
   const webCopy = webTranslations[language];
+  const flashState = useSyncExternalStore(
+    firmwareInstaller.subscribe,
+    firmwareInstaller.getSnapshot,
+  );
+  const firmwareOwnsPort = ownsFlash(flashState);
   const connected = snapshot.connection === "connected";
   const busyConnection = connectionBusy(snapshot.connection);
   const ownsPort = ownsConnection(snapshot.connection);
@@ -278,6 +286,13 @@ export function BridgeApp({
           {!demo && !bridge.native && (!connected || page === "settings") && (
             <BrowserAccess language={language} />
           )}
+          {!demo && !bridge.native && (
+            <FirmwareSetup
+              language={language}
+              hostIdle={!ownsPort && !busyConnection && !bridge.pending}
+              onConnect={connectAction}
+            />
+          )}
           {page === "share" ? (
             <>
               <section className="bridge-strip">
@@ -315,6 +330,7 @@ export function BridgeApp({
                     connected ? "secondary compact" : "primary compact"
                   }
                   disabled={
+                    firmwareOwnsPort ||
                     bridge.pending ||
                     Boolean(bridge.unsupported) ||
                     busyConnection
@@ -506,6 +522,7 @@ export function BridgeApp({
                     disabled={
                       !bridge.native &&
                       (ownsPort ||
+                        firmwareOwnsPort ||
                         bridge.pending ||
                         Boolean(bridge.unsupported))
                     }

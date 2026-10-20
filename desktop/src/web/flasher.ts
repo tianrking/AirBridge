@@ -310,8 +310,15 @@ export class FirmwareInstaller {
     });
   }
   private async fail(error: unknown) {
-    if (this.state.phase === "releasing" || this.state.phase === "cleanup_failed") {
-      this.publish({ phase: "cleanup_failed", error: "release", detail: String(error) });
+    if (
+      this.state.phase === "releasing" ||
+      this.state.phase === "cleanup_failed"
+    ) {
+      this.publish({
+        phase: "cleanup_failed",
+        error: "release",
+        detail: String(error),
+      });
       return;
     }
     try {

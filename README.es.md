@@ -230,6 +230,10 @@ La MAC AWDL, la instancia DNS, la etiqueta del host y el nombre de AirDrop son i
 
 La referencia principal para Linux es [t4t5/omdrop-owl](https://github.com/t4t5/omdrop-owl). Su estrategia de canal fijo, selección de sincronización y tratamiento del relleno de recepción orientan los requisitos de interoperabilidad. Gracias también a [OWL](https://github.com/seemoo-lab/owl) y [OpenDrop](https://github.com/seemoo-lab/opendrop) por su investigación sobre AWDL y AirDrop. El uso de las referencias y sus revisiones se documenta en [referencias del protocolo](docs/protocol-references.md); este árbol no incorpora código fuente del protocolo de esos proyectos.
 
+### Instalar firmware desde el navegador
+
+Abre [AirBridge Web](https://w0x7ce.eu/AirBridge/) y elige **Instalar firmware del puente**: comprueba las imágenes fijas de v0.0.1, selecciona la placa, instala y verifica la lectura Flash, y conecta al programa. No se necesita Python. La imagen completa exige **ESP32-S3 N16R8 (Flash de 16 MB, PSRAM octal de 8 MB) y USB nativo**; las variantes S3 no son intercambiables. Consulta [compatibilidad, recuperación y límites de validación](docs/browser-flashing.md).
+
 ## Licencia
 
 [MIT](LICENSE). AirDrop es tecnología de Apple. AirBridge es un proyecto experimental independiente, sin afiliación ni respaldo de Apple.

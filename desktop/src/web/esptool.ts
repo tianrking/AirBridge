@@ -1,5 +1,5 @@
 import { md5 } from "js-md5";
-import type { FlashDevice, Segment } from "./flasher";
+import { InstallError, type FlashDevice, type Segment } from "./flasher";
 // Loaded only after an explicit port choice. Never bundled into the demo's startup work.
 export async function espDevice(port: unknown): Promise<FlashDevice> {
   const { ESPLoader, Transport } = await import("esptool-js");
@@ -35,20 +35,29 @@ export async function espDevice(port: unknown): Promise<FlashDevice> {
       };
     },
     async write(parts, progress) {
-      await loader.writeFlash({
-        fileArray: parts.map((p) => ({
-          address: p.address,
-          data: p.data.slice(),
-        })),
-        flashMode: "keep",
-        flashFreq: "keep",
-        flashSize: "keep",
-        eraseAll: false,
-        compress: true,
-        reportProgress: (index, done, total) =>
-          progress(index, total ? done / total : 0),
-        calculateMD5Hash: (data) => md5(data),
-      });
+      try {
+        await loader.writeFlash({
+          fileArray: parts.map((p) => ({
+            address: p.address,
+            data: p.data.slice(),
+          })),
+          flashMode: "keep",
+          flashFreq: "keep",
+          flashSize: "keep",
+          eraseAll: false,
+          compress: true,
+          reportProgress: (index, done, total) =>
+            progress(index, total ? done / total : 0),
+          calculateMD5Hash: (data) => md5(data),
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes("MD5 of file does not match data in flash")
+        )
+          throw new InstallError("verify", error.message);
+        throw error;
+      }
     },
     async verify(part: Segment) {
       return (

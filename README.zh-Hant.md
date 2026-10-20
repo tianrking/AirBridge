@@ -219,6 +219,10 @@ AWDL MAC、DNS 服務實例、主機標籤與 AirDrop 顯示名稱各不相同�
 
 主要 Linux 參考為 [t4t5/omdrop-owl](https://github.com/t4t5/omdrop-owl)，其固定信道策略、同步來源選擇與接收填補處理，提供互通需求的重要依據。也感謝 [OWL](https://github.com/seemoo-lab/owl) 與 [OpenDrop](https://github.com/seemoo-lab/opendrop) 對 AWDL 和 AirDrop 的研究。參考用途與固定版本記錄於[協定參考](docs/protocol-references.md)；此原始碼樹未收錄上述專案的協定原始碼。
 
+### 在瀏覽器安裝韌體
+
+開啟 [AirBridge Web](https://w0x7ce.eu/AirBridge/)，選擇「安裝橋接器韌體」，即可檢查固定版本 v0.0.1、選擇開發板、燒錄並讀回驗證，再連接上位機，無須安裝 Python。完整映像需要 **ESP32-S3 N16R8（16 MB Flash、8 MB 八線 PSRAM）與原生 USB**；並非所有 S3 記憶體規格通用。詳見[相容性、復原步驟與驗收範圍](docs/browser-flashing.md)。
+
 ## 授權
 
 [MIT](LICENSE)。AirDrop 為 Apple 的技術。AirBridge 是獨立的實驗性專案，與 Apple 無隸屬關係，也未獲其背書。
