@@ -36,20 +36,24 @@ export async function espDevice(port: unknown): Promise<FlashDevice> {
     },
     async write(parts, progress) {
       try {
-        await loader.writeFlash({
-          fileArray: parts.map((p) => ({
-            address: p.address,
-            data: p.data.slice(),
-          })),
-          flashMode: "keep",
-          flashFreq: "keep",
-          flashSize: "keep",
-          eraseAll: false,
-          compress: true,
-          reportProgress: (index, done, total) =>
-            progress(index, total ? done / total : 0),
-          calculateMD5Hash: (data) => md5(data),
-        });
+        // Separate calls add a cancellation checkpoint before each next sector erase.
+        // The library's initial progress event occurs AFTER flashDeflBegin.
+        for (let index = 0; index < parts.length; index++) {
+          progress(index, 0);
+          const part = parts[index];
+          await loader.writeFlash({
+            fileArray: [{ address: part.address, data: part.data.slice() }],
+            flashMode: "keep",
+            flashFreq: "keep",
+            flashSize: "keep",
+            eraseAll: false,
+            compress: true,
+            reportProgress: (_, done, total) =>
+              progress(index, total ? done / total : 0),
+            calculateMD5Hash: (data) => md5(data),
+          });
+          progress(index, 1);
+        }
       } catch (error) {
         if (
           error instanceof Error &&

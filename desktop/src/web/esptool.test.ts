@@ -76,6 +76,27 @@ describe("Espressif adapter contract (mock ROM)", () => {
     ).rejects.toMatchObject({ code: "verify" });
     await device.close();
   });
+  it("cancellation during a segment's internal verification cannot erase the next segment", async () => {
+    let stopped = false;
+    fake.write.mockImplementationOnce(async () => {
+      stopped = true;
+    });
+    const device = await espDevice({});
+    await device.inspect();
+    await expect(
+      device.write(
+        [
+          { address: 0, data: new Uint8Array(4) },
+          { address: 0x8000, data: new Uint8Array(4) },
+        ],
+        () => {
+          if (stopped) throw new DOMException("Cancelled", "AbortError");
+        },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fake.write).toHaveBeenCalledTimes(1);
+    await device.close();
+  });
   for (const kind of [
     "SECURE_BOOT_EN",
     "SECURE_DOWNLOAD_ENABLE",
