@@ -15,3 +15,13 @@ if(MSVC)
 endif()
 target_link_libraries(protocol_tests PRIVATE airbridge_protocol)
 add_test(NAME protocol_tests COMMAND protocol_tests)
+
+add_executable(round_ui_tests tests/round_ui_tests.cpp core/round_ui.cpp)
+target_link_libraries(round_ui_tests PRIVATE airbridge_protocol)
+# Assertion-based policy checks must stay enabled in Release CI builds.
+if(MSVC)
+  target_compile_options(round_ui_tests PRIVATE /UNDEBUG)
+else()
+  target_compile_options(round_ui_tests PRIVATE -UNDEBUG)
+endif()
+add_test(NAME round_ui_tests COMMAND round_ui_tests)
