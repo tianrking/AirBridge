@@ -6,3 +6,9 @@ void native_sender_begin(const airbridge::awdl::Mac& own, const airbridge::awdl:
 bool native_sender_command(airbridge::awdl::Bytes line);
 void native_sender_observe(const airbridge::awdl::Announcement& peer, std::uint64_t received_us);
 bool native_sender_sync_peer(airbridge::awdl::Mac& peer);
+
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+#include "round_ui.hpp"
+// Invoked exclusively by the existing command task; never invents USB request IDs.
+bool native_sender_local_action(const airbridge::round_ui::Action& action,const char*& reason);
+#endif

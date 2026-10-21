@@ -14,7 +14,11 @@ struct Peer {
 };
 enum class Phase { idle, preparing, sending, receiving, verifying, complete, failed, uncertain };
 enum class ActionKind { resolve, allow, revoke, cancel };
-struct Action { ActionKind kind{}; awdl::Mac peer{}; std::uint16_t port{}; };
+struct Action {
+    ActionKind kind{};
+    awdl::Mac peer{};
+    std::uint16_t port{};
+};
 struct Transfer {
     Phase phase{};
     std::array<char, 256> name{};
@@ -27,7 +31,7 @@ struct Transfer {
 struct State {
     std::array<Peer, 12> peers{};
     awdl::Mac selected{}, allowed{}, radio_mac{};
-    std::array<Transfer, 2> transfers{}; // Receive and send remain independent.
+    std::array<Transfer, 2> transfers{};  // Receive and send remain independent.
     std::array<char, 80> notice{};
     bool radio_ready{};
     unsigned brightness{65};
@@ -40,7 +44,8 @@ struct State {
     bool select(const awdl::Mac& mac, std::uint64_t now);
     bool action(ActionKind kind, std::uint64_t now, Action& output) const;
     void message(const char* text);
+    void host_reply(bool okay, const char* reason, std::uint64_t now);
     void finish_receive(bool committed, bool response_written, std::uint64_t now);
     void receive_closed(std::uint64_t now);
 };
-} // namespace airbridge::round_ui
+}  // namespace airbridge::round_ui

@@ -27,6 +27,9 @@
 #include "mbedtls/x509_crt.h"
 #include "miniz.h"
 #include "native_sender.hpp"
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+#include "round_display.hpp"
+#endif
 #include "native_service.hpp"
 #include "psa/crypto.h"
 #include "serial_channel.hpp"
@@ -34,6 +37,10 @@
 using namespace airbridge;
 namespace {
 awdl::Mac identity{}, allowed{};
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+StackType_t* reserved_server_stack;
+StaticTask_t reserved_server_control;
+#endif
 std::atomic<bool> listening{}, host_committed{}, receiving{};
 portMUX_TYPE commit_lock = portMUX_INITIALIZER_UNLOCKED;
 std::array<char, 33> commit_nonce{};
@@ -246,6 +253,9 @@ bool write_file(void* p, awdl::Bytes input) {
         portEXIT_CRITICAL(&commit_lock);
         if (!chunk_received)
             return false;
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+        airbridge::round_display::receive_bytes(count);
+#endif
         at += count;
         session.offset += std::uint32_t(count);
     }
@@ -277,6 +287,14 @@ void commands(void*) {
     std::array<char, 64> incoming{};
     serial::LineDecoder decoder;
     for (;;) {
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+        airbridge::round_ui::Action action{};
+        if (airbridge::round_display::next_action(action)) {
+            const char* reason="Action unavailable";
+            const bool okay=native_sender_local_action(action,reason);
+            airbridge::round_display::action_result(action,okay,reason);
+        }
+#endif
         const int count = serial_read(incoming.data(), incoming.size(), 1);
         if (count < 0) {
             event("serial_read_error");
@@ -303,6 +321,9 @@ void commands(void*) {
             auto* end = std::strpbrk(line.data(), "\r\n");
             if (end)
                 *end = 0;
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+            if (airbridge::round_display::diagnostic_command(line.data())) continue;
+#endif
             if (!std::strncmp(line.data(), "COMMIT ", 7)) {
                 portENTER_CRITICAL(&commit_lock);
                 if (commit_nonce[0] && !std::strcmp(line.data() + 7, commit_nonce.data()))
@@ -636,17 +657,39 @@ void mdns(void*) {
     }
 }
 }  // namespace
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+esp_err_t native_receiver_reserve() {
+    if (reserved_server_stack) return ESP_ERR_INVALID_STATE;
+    reserved_server_stack = static_cast<StackType_t*>(heap_caps_malloc(32768, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    return reserved_server_stack ? ESP_OK : ESP_ERR_NO_MEM;
+}
+#endif
 esp_err_t native_receiver_begin(const awdl::Mac& own, const awdl::Mac& allowed_peer) {
     if (device_identity_begin() != ESP_OK) return ESP_FAIL;
     identity = own;
     allowed = allowed_peer;
     native_sender_begin(own, allowed_peer);
-    if (xTaskCreatePinnedToCore(commands, "serial_commit", 16384, nullptr, 1, nullptr, 1) !=
-            pdPASS ||
-        xTaskCreatePinnedToCore(server, "airdrop_receive", 32768, nullptr, 1, nullptr, 1) !=
-            pdPASS ||
-        xTaskCreatePinnedToCore(mdns, "airdrop_mdns", 6144, nullptr, 1, nullptr, 1) != pdPASS)
-        return ESP_ERR_NO_MEM;
+    const struct TaskSpec { TaskFunction_t entry; const char* name; unsigned stack; } tasks[] = {
+        {commands, "serial_commit", 16384}, {server, "airdrop_receive", 32768},
+        {mdns, "airdrop_mdns", 6144}};
+    for (const auto& task : tasks) {
+        bool created = false;
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+        if (task.entry == server) {
+            created = reserved_server_stack && xTaskCreateStaticPinnedToCore(server, task.name, task.stack, nullptr, 1,
+                        reserved_server_stack, &reserved_server_control, 1);
+        } else
+#endif
+        {
+            created = xTaskCreatePinnedToCore(task.entry, task.name, task.stack, nullptr, 1, nullptr, 1) == pdPASS;
+        }
+        if (!created) {
+            record("{\"event\":\"native_task_failed\",\"task\":\"%s\",\"internal_free\":%u,\"internal_largest\":%u}\n",
+                   task.name, unsigned(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+                   unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)));
+            return ESP_ERR_NO_MEM;
+        }
+    }
     return ESP_OK;
 }
 

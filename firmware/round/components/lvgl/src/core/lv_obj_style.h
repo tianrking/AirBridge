@@ -79,9 +79,9 @@ void lv_obj_add_style(struct _lv_obj_t * obj, lv_style_t * style, lv_style_selec
  * @param obj       pointer to an object
  * @param style     pointer to a style to remove. Can be NULL to check only the selector
  * @param selector  OR-ed values of states and a part to remove only styles with matching selectors. LV_STATE_ANY and LV_PART_ANY can be used
- * @example lv_obj_remove_style(obj, &style, LV_PART_ANY | LV_STATE_ANY); //Remove a specific style
+ * @example lv_obj_remove_style(obj, &style, (lv_style_selector_t)LV_PART_ANY | (lv_style_selector_t)LV_STATE_ANY); //Remove a specific style
  * @example lv_obj_remove_style(obj, NULL, LV_PART_MAIN | LV_STATE_ANY); //Remove all styles from the main part
- * @example lv_obj_remove_style(obj, NULL, LV_PART_ANY | LV_STATE_ANY); //Remove all styles
+ * @example lv_obj_remove_style(obj, NULL, (lv_style_selector_t)LV_PART_ANY | (lv_style_selector_t)LV_STATE_ANY); //Remove all styles
  */
 void lv_obj_remove_style(struct _lv_obj_t * obj, lv_style_t * style, lv_style_selector_t selector);
 
@@ -91,7 +91,7 @@ void lv_obj_remove_style(struct _lv_obj_t * obj, lv_style_t * style, lv_style_se
  */
 static inline void lv_obj_remove_style_all(struct _lv_obj_t * obj)
 {
-    lv_obj_remove_style(obj, NULL, LV_PART_ANY | LV_STATE_ANY);
+    lv_obj_remove_style(obj, NULL, (lv_style_selector_t)LV_PART_ANY | (lv_style_selector_t)LV_STATE_ANY);
 }
 
 /**

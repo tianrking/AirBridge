@@ -1,17 +1,13 @@
-#include "round_board.h"
-#include "pins.h"
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
+#include "esp_check.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_check.h"
+#include "pins.h"
+#include "round_board.h"
 static i2c_master_dev_handle_t touch;
-bool round_board_button_pressed(void)
-{
-    return gpio_get_level(BTN_PIN) == 0;
-}
-esp_err_t round_board_input_init(void)
-{
+bool round_board_button_pressed(void) { return gpio_get_level(BTN_PIN) == 0; }
+esp_err_t round_board_input_init(void) {
     gpio_config_t button = {
         .pin_bit_mask = 1ULL << BTN_PIN, .mode = GPIO_MODE_INPUT, .pull_up_en = 1};
     ESP_RETURN_ON_ERROR(gpio_config(&button), "input", "button");
@@ -40,8 +36,7 @@ esp_err_t round_board_input_init(void)
     const uint8_t awake[] = {0xFE, 0x01};
     return i2c_master_transmit(touch, awake, sizeof(awake), 100);
 }
-esp_err_t round_board_touch_read(uint16_t *x, uint16_t *y, bool *pressed)
-{
+esp_err_t round_board_touch_read(uint16_t* x, uint16_t* y, bool* pressed) {
     if (!x || !y || !pressed)
         return ESP_ERR_INVALID_ARG;
     *pressed = false;

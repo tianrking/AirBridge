@@ -1,6 +1,9 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 // Receive-only protocol qualification image. No AWDL presence or file service.
 #include "awdl.hpp"
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+#include "round_display.hpp"
+#endif
 #include "presence.hpp"
 #ifdef AIRBRIDGE_IPV6_LINK
 #include "ipv6_link.hpp"
@@ -134,7 +137,11 @@ extern "C" void app_main() {
         if(error!=ESP_OK) {diagnostic_printf("{\"event\":\"startup_failed\",\"stage\":\"%s\",\"code\":%d}\n",stage,int(error));return false;}
         return true;
     };
-    if(!check(nvs_flash_init(),"nvs") || !check(esp_netif_init(),"netif") ||
+    if(!check(nvs_flash_init(),"nvs")) return;
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+    if(!check(native_receiver_reserve(),"native_stack_reserve")) return;
+#endif
+    if(!check(esp_netif_init(),"netif") ||
        !check(esp_event_loop_create_default(),"events")) return;
 #ifdef AIRBRIDGE_NATIVE_SERVICE
     if(!check(ble_presence_begin(),"ble_presence")) return;
@@ -176,6 +183,11 @@ extern "C" void app_main() {
 #ifdef AIRBRIDGE_NATIVE_SERVICE
     const Mac permitted_peer{AIRBRIDGE_PROBE_PEER_BYTES};
     if(!check(native_receiver_begin(own,permitted_peer),"native_receiver")) return;
+#endif
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+    // Reserve the native service stacks before allocating LCD DMA memory.
+    if(!check(airbridge::round_display::begin(serial_record),"round_display")) return;
+    airbridge::round_display::radio_ready(own);
 #endif
     diagnostic_printf("{\"event\":\"scanner_ready\",\"channel\":6,\"native_transfer_verified\":false}\n");
     // The 12-row table must not consume the default 3584-byte app_main stack.
@@ -288,6 +300,9 @@ extern "C" void app_main() {
 #endif
         if(now<next) continue;
         next=now+1'000'000;
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+        airbridge::round_display::observe(peers,std::uint64_t(now));
+#endif
 #ifdef AIRBRIDGE_NATIVE_SERVICE
         if(!serial_diagnostic_lock()) continue;
 #endif

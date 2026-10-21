@@ -1,5 +1,8 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 #include "serial_channel.hpp"
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+#include "round_display.hpp"
+#endif
 
 #include <cstdio>
 
@@ -31,6 +34,9 @@ int serial_read(char* bytes, std::size_t capacity, unsigned timeout_ms) {
     return usb_serial_jtag_read_bytes(bytes, capacity, pdMS_TO_TICKS(timeout_ms));
 }
 bool serial_record(const char* bytes, std::size_t length) {
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+    airbridge::round_display::serial_event(bytes,length);
+#endif
     if (!bytes || !length || length > 1024 || !serial_diagnostic_lock(5000))
         return false;
     const bool written = serial_diagnostic_write(bytes, length, 5000);

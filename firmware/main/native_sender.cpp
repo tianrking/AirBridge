@@ -1,5 +1,8 @@
 // Copyright (c) 2026 tianrking <10758833+tianrking@users.noreply.github.com>
 #include "native_sender.hpp"
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+#include "round_display.hpp"
+#endif
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -517,6 +520,9 @@ bool native_sender_command(awdl::Bytes line) {
             session = token;
             replay.reset();
         }
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+        airbridge::round_display::host_activity();
+#endif
         reply(command, true, "hello", upload.written, false);
         return true;
     }
@@ -536,6 +542,9 @@ bool native_sender_command(awdl::Bytes line) {
         reply(command, false, "stale_or_conflicting_sequence", 0, false);
         return true;
     }
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+    airbridge::round_display::host_activity();
+#endif
     if (!std::strcmp(body, "CANCEL")) {
         if (busy)
             cancelled = true;
@@ -634,6 +643,9 @@ bool native_sender_command(awdl::Bytes line) {
             upload.digest[i * 2] = digits[hash[i] >> 4];
             upload.digest[i * 2 + 1] = digits[hash[i] & 15];
         }
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+        airbridge::round_display::stage_outgoing(0,upload.size);
+#endif
         reply(command, true, "ready");
         return true;
     }
@@ -660,6 +672,9 @@ bool native_sender_command(awdl::Bytes line) {
         }
         std::memcpy((metadata ? upload.metadata : upload.file) + written, decoded.data(), size);
         written += size;
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+        if (data) airbridge::round_display::stage_outgoing(written,upload.size);
+#endif
         reply(command, true, "chunk", written);
         return true;
     }
@@ -686,6 +701,9 @@ bool native_sender_command(awdl::Bytes line) {
             reply(command, false, "manifest_mismatch");
             return true;
         }
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+        airbridge::round_display::stage_outgoing(upload.size,upload.size,upload.manifest.files[0].name.data());
+#endif
         cancelled = false;
         busy = true;
         if (xTaskCreatePinnedToCore(send_worker, "airdrop_send", 16384, nullptr, 1, nullptr, 1) !=
@@ -700,3 +718,38 @@ bool native_sender_command(awdl::Bytes line) {
     reply(command, false, "unknown_command");
     return true;
 }
+
+#ifdef AIRBRIDGE_ROUND_DISPLAY
+bool native_sender_local_action(const airbridge::round_ui::Action& action,const char*& reason) {
+    using K=airbridge::round_ui::ActionKind;
+    if(action.kind==K::cancel) {
+        if(busy) {cancelled=true;reason="Cancellation requested";}
+        else {clear_upload();reason="Staging cancelled";}
+        return true;
+    }
+    if(busy || upload.file) {reason="File or name operation active";return false;}
+    if(action.kind==K::revoke) {
+        if(!native_receiver_set_peer({})) {reason="Receiving; wait until finished";return false;}
+        permitted_peer={};reason="Receiving access revoked";return true;
+    }
+    if(action.peer==awdl::Mac{} || (action.peer[0]&1) || action.peer==identity || !eligible_peer(action.peer,action.port)) {
+        reason="Advertisement expired; try again";return false;
+    }
+    if(action.kind==K::allow) {
+        if(!native_receiver_set_peer(action.peer)) {reason="Receiving; wait until finished";return false;}
+        permitted_peer=action.peer;
+        portENTER_CRITICAL(&peer_lock);preferred_peer=action.peer;portEXIT_CRITICAL(&peer_lock);
+        reason="Allowed sender / this session";return true;
+    }
+    if(action.kind==K::resolve) {
+        clear_upload();upload.peer=action.peer;upload.port=action.port;upload.resolve_only=true;
+        portENTER_CRITICAL(&peer_lock);preferred_peer=action.peer;portEXIT_CRITICAL(&peer_lock);
+        cancelled=false;busy=true;
+        if(xTaskCreatePinnedToCore(send_worker,"airdrop_resolve",16384,nullptr,1,nullptr,1)!=pdPASS) {
+            busy=false;clear_upload();reason="Not enough memory for lookup";return false;
+        }
+        reason="Reading the native AirDrop name";return true;
+    }
+    reason="Unknown control action";return false;
+}
+#endif

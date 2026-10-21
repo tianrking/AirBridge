@@ -1,13 +1,14 @@
-#include "round_ui.hpp"
 #include <cassert>
 #include <cstring>
 #include <limits>
+
+#include "round_ui.hpp"
 using namespace airbridge;
 int main() {
     round_ui::State state;
     awdl::PeerTable table;
     awdl::Announcement announcement{};
-    announcement.source = {2,1,2,3,4,5};
+    announcement.source = {2, 1, 2, 3, 4, 5};
     announcement.service.airdrop = true;
     announcement.service.port = 8770;
     std::strcpy(announcement.hostname.data(), "observed-host");
@@ -23,13 +24,16 @@ int main() {
     assert(action.peer == announcement.source && action.port == 8770);
     assert(!state.action(round_ui::ActionKind::allow, 11'000'000, action));
     assert(!state.action(round_ui::ActionKind::resolve, 0, action));
-    assert(!state.select({2,9,9,9,9,9}, 1'100'000));
-    assert(!state.set_name({2,9,9,9,9,9}, "Unknown"));
+    assert(!state.select({2, 9, 9, 9, 9, 9}, 1'100'000));
+    assert(!state.set_name({2, 9, 9, 9, 9, 9}, "Unknown"));
     assert(!state.set_name(announcement.source, ""));
     auto& receive = state.transfers[0];
     auto& send = state.transfers[1];
-    receive.phase = round_ui::Phase::receiving; receive.total = receive.done = 262145;
-    send.phase = round_ui::Phase::sending; send.total = 65537; send.done = 42;
+    receive.phase = round_ui::Phase::receiving;
+    receive.total = receive.done = 262145;
+    send.phase = round_ui::Phase::sending;
+    send.total = 65537;
+    send.done = 42;
     assert(receive.progress() == 999);
     state.finish_receive(true, false, 1'300'000);
     assert(receive.phase == round_ui::Phase::uncertain && receive.progress() < 1000);
@@ -43,7 +47,8 @@ int main() {
     receive.phase = round_ui::Phase::receiving;
     state.receive_closed(2'000'000);
     assert(receive.phase == round_ui::Phase::uncertain);
-    send.total = std::numeric_limits<std::uint64_t>::max(); send.done = send.total;
+    send.total = std::numeric_limits<std::uint64_t>::max();
+    send.done = send.total;
     assert(send.progress() == 999);
     send.phase = round_ui::Phase::idle;
     assert(!state.action(round_ui::ActionKind::cancel, 2'000'000, action));
@@ -52,8 +57,21 @@ int main() {
     assert(state.count(12'000'000) == 0);
     assert(!state.action(round_ui::ActionKind::allow, 12'000'000, action));
     // Reappearance keeps selection tied to a MAC, never a recycled row number.
-    auto other = announcement; other.source[5] = 8;
-    table.update(other, -55, 13'000'000); state.observe(table, 13'000'001);
+    auto other = announcement;
+    other.source[5] = 8;
+    table.update(other, -55, 13'000'000);
+    state.observe(table, 13'000'001);
     assert(state.count(13'000'001) == 1);
     assert(!state.action(round_ui::ActionKind::allow, 13'000'001, action));
+    send.phase = round_ui::Phase::preparing;
+    state.host_reply(false, "offset_or_length", 14'000'000);
+    assert(send.phase == round_ui::Phase::preparing);
+    state.host_reply(false, "sha256_mismatch", 14'000'001);
+    assert(send.phase == round_ui::Phase::failed && send.progress() != 1000);
+    send.phase = round_ui::Phase::preparing;
+    state.host_reply(true, "cancelled", 14'000'002);
+    assert(send.phase == round_ui::Phase::uncertain);
+    send.phase = round_ui::Phase::sending;
+    state.host_reply(true, "cancelled", 14'000'003);
+    assert(send.phase == round_ui::Phase::sending);  // Wait for the native worker outcome.
 }

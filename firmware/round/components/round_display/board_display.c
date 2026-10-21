@@ -1,25 +1,20 @@
-#include "round_board.h"
-#include "pins.h"
-#include "driver/spi_master.h"
 #include "driver/ledc.h"
+#include "driver/spi_master.h"
 #include "esp_check.h"
-#include "esp_lcd_st77916.h"
 #include "esp_lcd_custom_types.h"
+#include "esp_lcd_st77916.h"
+#include "pins.h"
+#include "round_board.h"
 static esp_lcd_panel_handle_t panel;
-esp_lcd_panel_handle_t round_board_display_panel(void)
-{
-    return panel;
-}
-esp_err_t round_board_backlight_set(unsigned percent)
-{
+esp_lcd_panel_handle_t round_board_display_panel(void) { return panel; }
+esp_err_t round_board_backlight_set(unsigned percent) {
     if (percent > 100)
         return ESP_ERR_INVALID_ARG;
     ESP_RETURN_ON_ERROR(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, percent * 8191 / 100),
                         "display", "duty");
     return ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
-esp_err_t round_board_display_init(esp_lcd_panel_io_color_trans_done_cb_t done, void *context)
-{
+esp_err_t round_board_display_init(esp_lcd_panel_io_color_trans_done_cb_t done, void* context) {
     ledc_timer_config_t timer = {.speed_mode = LEDC_LOW_SPEED_MODE,
                                  .duty_resolution = LEDC_TIMER_13_BIT,
                                  .timer_num = LEDC_TIMER_0,
