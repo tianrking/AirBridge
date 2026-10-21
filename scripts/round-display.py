@@ -115,6 +115,27 @@ def rgb565_png(pixels):
     return b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR', struct.pack('>IIBBBBB',360,360,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(rows))+chunk(b'IEND',b'')
 
 
+def monitor(link, cycles, exercise_navigation=False):
+    if not 1 <= cycles <= 1000:
+        raise ValueError('Cycles must be 1..1000')
+    samples=[link.status()]
+    for cycle in range(cycles):
+        if exercise_navigation:
+            for view in ('home','devices','transfer','settings','peer'):link.view(view)
+        else:
+            time.sleep(2.5)
+        sample=link.status();samples.append(sample)
+        if sample['reset_reason']!=samples[0]['reset_reason'] or sample['uptime_ms']<samples[-2]['uptime_ms'] or link.boots:
+            raise RuntimeError('Board restarted during acceptance')
+        if sample['display_errors'] or sample['touch_errors']:
+            raise RuntimeError('Display or touch driver error')
+        if not sample['radio_ready'] or sample['internal_free']<30000:
+            raise RuntimeError('Radio unavailable or internal heap below acceptance floor')
+    if exercise_navigation:link.view('home')
+    return {'cycles':cycles,'navigation_exercised':exercise_navigation,'views':cycles*5 if exercise_navigation else 0,
+            'boots_observed':link.boots,'samples':samples,'physical_touch_tested':False,'native_airdrop_transfer_tested':False}
+
+
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port',required=True)
@@ -122,7 +143,7 @@ if __name__ == '__main__':
     sub=parser.add_subparsers(dest='command',required=True)
     sub.add_parser('status')
     screen=sub.add_parser('screen');screen.add_argument('--output',type=Path,required=True);screen.add_argument('--view',choices=['home','devices','transfer','settings','peer'])
-    stability=sub.add_parser('stability');stability.add_argument('--cycles',type=int,default=20);stability.add_argument('--output',type=Path,required=True)
+    stability=sub.add_parser('stability');stability.add_argument('--cycles',type=int,default=20);stability.add_argument('--output',type=Path,required=True);stability.add_argument('--exercise-navigation',action='store_true',help='Visibly cycle pages for an unattended bench test; default only monitors status')
     brightness=sub.add_parser('brightness');brightness.add_argument('percent',type=int)
     args=parser.parse_args()
     link=RoundLink(args.port,args.serial)
@@ -136,18 +157,7 @@ if __name__ == '__main__':
             link.send('ROUND BRIGHTNESS '+str(args.percent));time.sleep(.5);print(json.dumps(link.status()))
         else:
             if not 1<=args.cycles<=1000:parser.error('Cycles must be 1..1000')
-            samples=[link.status()]
-            for cycle in range(args.cycles):
-                for view in ('home','devices','transfer','settings','peer'):link.view(view)
-                sample=link.status();samples.append(sample)
-                if sample['reset_reason']!=samples[0]['reset_reason'] or sample['uptime_ms']<samples[-2]['uptime_ms'] or link.boots:
-                    raise RuntimeError('Board restarted during acceptance')
-                if sample['display_errors'] or sample['touch_errors']:
-                    raise RuntimeError('Display or touch driver error')
-                if not sample['radio_ready'] or sample['internal_free']<30000:
-                    raise RuntimeError('Radio unavailable or internal heap below acceptance floor')
-            link.view('home')
-            result={'cycles':args.cycles,'views':args.cycles*5,'boots_observed':link.boots,'samples':samples,'physical_touch_tested':False,'native_airdrop_transfer_tested':False}
+            result=monitor(link,args.cycles,args.exercise_navigation)
             args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(result,indent=2)+'\n')
-            print(json.dumps({'cycles':args.cycles,'views':args.cycles*5,'samples':len(samples),'output':str(args.output),'final':samples[-1]}))
+            print(json.dumps({'cycles':args.cycles,'views':result['views'],'samples':len(result['samples']),'output':str(args.output),'final':result['samples'][-1]}))
     finally:link.close()

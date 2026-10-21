@@ -5,6 +5,7 @@ import struct
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 import zlib
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('round_display_diagnostics',ROOT/'scripts/round-display.py')
@@ -60,3 +61,30 @@ class FrameCapture(unittest.TestCase):
             result=link.screenshot(target)
             self.assertTrue(target.exists());self.assertEqual(result['rgb565_bytes'],259200)
             self.assertIn('not a photograph',result['source']);self.assertEqual(link.commands,['ROUND SCREEN'])
+
+
+class PassiveMonitor(unittest.TestCase):
+    class Device:
+        def __init__(self): self.boots=0;self.views=[];self.uptime=0;self.failure=False
+        def view(self,page):self.views.append(page)
+        def status(self):
+            self.uptime+=100
+            return dict(reset_reason=11,uptime_ms=self.uptime,display_errors=0,touch_errors=0,
+                        radio_ready=not self.failure,internal_free=36000)
+
+    def test_default_monitor_never_changes_pages(self):
+        device=self.Device()
+        with patch.object(module.time,'sleep'):
+            result=module.monitor(device,3)
+        self.assertEqual(device.views,[]);self.assertEqual(result['views'],0)
+        self.assertFalse(result['navigation_exercised']);self.assertEqual(len(result['samples']),4)
+
+    def test_visible_navigation_requires_explicit_opt_in(self):
+        device=self.Device();result=module.monitor(device,1,exercise_navigation=True)
+        self.assertEqual(device.views,['home','devices','transfer','settings','peer','home'])
+        self.assertEqual(result['views'],5);self.assertTrue(result['navigation_exercised'])
+
+    def test_radio_failure_does_not_produce_acceptance_or_change_page(self):
+        device=self.Device();device.failure=True
+        with patch.object(module.time,'sleep'),self.assertRaises(RuntimeError):module.monitor(device,1)
+        self.assertEqual(device.views,[])
