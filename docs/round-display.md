@@ -4,7 +4,7 @@ An ESP-IDF **6.1** display variant on the **`round-display` branch**. `main` ret
 
 ![AirBridge Round: live MCU-rendered home screen](assets/round-home.png)
 
-*Captured from the running MCU framebuffer; physical display and touch were separately confirmed by the user.*
+*Captured from the initial running MCU framebuffer; the current build separates nearby and ready counts. Physical display and touch were separately confirmed by the user.*
 
 ## Board and pins
 
@@ -72,8 +72,8 @@ This overwrites the previous application. A failed/partial install requires rein
 
 ## On-screen controls
 
-- **Home:** moving AWDL ring, actual fresh AirDrop service count, and recent valid USB-host activity. A nearby AWDL source without a current AirDrop advertisement is not presented as a ready recipient.
-- **Devices:** two rows per page, previous/next navigation, observed hostname or a native resolved name, address and actual RSSI. Touch a row for its details. Selection is tied to the address, not a recycled list index; stale recipients are disabled.
+- **Home:** moving AWDL ring, separate live-neighbor and AirDrop-ready counts, and recent valid USB-host activity. A recently observed AWDL source stays visible even without a fresh AirDrop service advertisement; it is not presented as ready to transfer.
+- **Devices:** two rows per page, previous/next navigation, observed hostname or a native resolved name, address and actual RSSI. Touch any recently observed row for its details. Selection is tied to the address, not a recycled list index. Details distinguish an unannounced/expired AirDrop service from a device that is no longer nearby. Allow/name actions require a fresh AirDrop service and remain disabled otherwise.
 - **Read name:** performs the existing TLS/native `/Discover` request. A host hint stays explicitly unverified until that succeeds. The compact CJK fallback includes common characters; unsupported glyphs may display a placeholder, with the MAC retained for identification.
 - **Allow sender / Revoke access:** changes the same session peer authorization used by the host. A new host HELLO session clears authorization as in the standard public firmware. This is not verified Apple-account/contact authentication. Busy/receiving conflicts are refused.
 - **Activity:** independent incoming/outgoing states and progress. 100% bytes alone is not completion; incoming success needs Windows's persisted-file commit plus the native response. An interrupted/unconfirmed operation does not become a successful receipt. Outgoing files are still selected/staged by the existing Windows/web host; cancel runs through the existing command owner.
@@ -93,7 +93,7 @@ python scripts/round-display.py --port COMx --serial AA:BB:CC:DD:EE:FF stability
 
 Normal firmware stays on the current page until a touch/BOOT action. The `stability` command now **only monitors status by default**, without changing pages. The optional `--exercise-navigation` deliberately switches all five pages and is intended only for an unattended bench test. No such test runs automatically at boot.
 
-Only one tool owns USB at a time. `ROUND STATUS` reports actual radio state, touch polls/errors/coordinates, LCD DMA completions, heap, uptime, reset cause and stack low-water marks. `ROUND VIEW` requests navigation on the sole LVGL task, not from the serial task. `ROUND SCREEN` reads a bounded RGB565 framebuffer through offset-checked records; a PNG is written only after all 259,200 bytes and the final completion record arrive. **That is a live render-buffer capture, not a photo proving glass color, orientation, light output or physical touch.** Do not infer native AirDrop success from an animation, a driver callback, a screenshot or CI.
+Only one tool owns USB at a time. `ROUND STATUS` reports `peers` (recently observed AWDL neighbors) and `airdrop_ready` (fresh service offers), actual radio state, touch polls/errors/coordinates, LCD DMA completions, heap, uptime, reset cause and stack low-water marks. `ROUND VIEW` requests navigation on the sole LVGL task, not from the serial task. `ROUND SCREEN` reads a bounded RGB565 framebuffer through offset-checked records; a PNG is written only after all 259,200 bytes and the final completion record arrive. **That is a live render-buffer capture, not a photo proving glass color, orientation, light output or physical touch.** Do not infer native AirDrop success from an animation, a driver callback, a screenshot or CI.
 
 The host C++ policy tests exercise expiration, selection identity, authorization, independent duplex progress and receipt gating. Python tests exercise frame byte order, PNG checksums, corrupt/truncated/duplicate chunks and refusal to write incomplete screenshots. CI builds the standard profile and this round variant separately. Raw Flash/NVS backups and nearby peer logs stay ignored under `work/`.
 

@@ -251,8 +251,8 @@ void update(std::uint64_t now) {
     char buffer[300];
     if (page == 0) {
         label_text(heading, snapshot->radio_ready ? "AWDL / CHANNEL 6" : "STARTING WIRELESS");
-        std::snprintf(buffer, sizeof(buffer), "%u nearby device%s", snapshot->count(now),
-                      snapshot->count(now) == 1 ? "" : "s");
+        std::snprintf(buffer, sizeof(buffer), "%u nearby / %u ready", snapshot->count(now),
+                      snapshot->ready_count(now));
         label_text(caption, buffer);
         const bool active = snapshot->host_activity && now >= snapshot->host_activity &&
                             now - snapshot->host_activity < 30'000'000;
@@ -264,7 +264,7 @@ void update(std::uint64_t now) {
         const round_ui::Peer* visible[12]{};
         unsigned count = 0;
         for (const auto& peer : snapshot->peers)
-            if (snapshot->eligible(peer, now))
+            if (snapshot->observed(peer, now))
                 visible[count++] = &peer;
         if (offset >= count)
             offset = count ? ((count - 1) / 2) * 2 : 0;
@@ -284,13 +284,15 @@ void update(std::uint64_t now) {
                           peer.mac[5], int(peer.rssi));
             label_text(addresses[i], buffer);
         }
-        label_text(caption,
-                   count ? "Tap a device to view / allow" : "Open Apple AirDrop / Everyone");
+        std::snprintf(buffer, sizeof(buffer), "%u seen / %u AirDrop ready", count,
+                      snapshot->ready_count(now));
+        label_text(caption, count ? buffer : "Listening for AWDL on channel 6");
         std::snprintf(buffer, sizeof(buffer), "%u / %u", offset / 2 + 1,
                       std::max(1u, (count + 1) / 2));
         label_text(pager, buffer);
     } else if (page == 4) {
         const auto* peer = snapshot->find(snapshot->selected);
+        const bool seen = peer && snapshot->observed(*peer, now);
         const bool valid = peer && snapshot->eligible(*peer, now);
         label_text(heading, peer ? (peer->resolved       ? peer->name.data()
                                     : *peer->host.data() ? peer->host.data()
@@ -300,7 +302,9 @@ void update(std::uint64_t now) {
         std::snprintf(buffer, sizeof(buffer), "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1],
                       mac[2], mac[3], mac[4], mac[5]);
         label_text(caption, buffer);
-        label_text(subcaption, !valid ? "Advertisement expired"
+        label_text(subcaption, !seen    ? "Device no longer nearby"
+                               : !valid ? (peer->port ? "AirDrop announcement expired"
+                                                      : "AWDL seen / AirDrop not announced")
                                : snapshot->allowed == snapshot->selected
                                    ? "Allowed sender / this session"
                                : peer->resolved ? "Name from native AirDrop"

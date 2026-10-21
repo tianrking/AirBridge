@@ -16,7 +16,7 @@ Date: 2026-10-21. This is a bounded hardware acceptance record for the **Spotpea
 | Full preflash backup | 16,777,216 bytes retained privately; SHA-256 `4217fec89e88ab0ce9276569f311f6dc1772af8283087f662ea71fbbdd249c31` |
 | Program verification | Bootloader, partition table and application independently read back and byte-compared; all match |
 | NVS preservation during programming | 24,576 bytes read before/after and equal |
-| Current application | 1,565,984 bytes; SHA-256 `9abafa73776e42b4ba598e33623882048104694157db13cc3f20d44647f75138` |
+| Current application | 1,566,240 bytes; SHA-256 `0fc38a2564946b593976105c35ab640fb8e31633348e93704ef1bbc91359502c` |
 | Wireless startup | `radio_ready=true`; Wi-Fi, BLE, native command/server/mDNS tasks started |
 | Nearby services | Two fresh AirDrop advertisements observed during bring-up; presence expires when advertisements stop |
 | Host protocol | Real AB2 HELLO and STATUS accepted; protocol 2 and 112-byte chunk capability returned |
@@ -49,3 +49,13 @@ Private NVS/full-flash backups, nearby addresses and raw session logs are kept u
 ## Normal-use handoff
 
 After the bounded bench navigation tests, the board was restored to its normal home page and all automated page switching/captures stopped. Physical display and touch were confirmed by the user. The diagnostic monitor defaults to passive status checks; visible navigation requires the explicit `--exercise-navigation` option. Native Apple interoperability remains deferred until a test Mac is available.
+
+## Nearby-list filtering correction
+
+A subsequent user report reproduced a misleading empty Devices list. The running board still received two live AWDL sources around -73/-78 dBm, with no radio reboot or touch errors, but the UI hid any source without an AirDrop service offer younger than ten seconds. That mixed physical observation with transfer eligibility.
+
+The corrected model keeps all recently observed AWDL neighbors in the list and reports a separate `airdrop_ready` count. A user may inspect an unready neighbor, while allow/name actions still require a fresh valid service offer. Disappeared devices expire after the existing ten-second observation window. Tests cover AWDL-only sources, fresh offers, offers expiring while AWDL traffic continues, invalid clocks and rejection of transfer actions for unready sources. Neither observing AWDL nor a fresh offer proves TLS or file-transfer success.
+
+The updated image was flashed only to the explicitly identified COM4 board; all three segments matched independent readback and NVS was preserved. Validation reads status without automatic navigation.
+
+In sixteen consecutive post-fix samples, `peers` remained 2–3 while `airdrop_ready` stayed 0. Display/touch error counters remained zero and radio startup remained ready. This confirms that unready but recently observed neighbors are no longer hidden by the model; physical list confirmation is recorded separately when supplied.

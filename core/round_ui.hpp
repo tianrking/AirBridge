@@ -39,8 +39,10 @@ struct State {
     void observe(const awdl::PeerTable& table, std::uint64_t now);
     bool set_name(const awdl::Mac& mac, const char* name);
     const Peer* find(const awdl::Mac& mac) const;
+    bool observed(const Peer& peer, std::uint64_t now) const;
     bool eligible(const Peer& peer, std::uint64_t now) const;
     unsigned count(std::uint64_t now) const;
+    unsigned ready_count(std::uint64_t now) const;
     bool select(const awdl::Mac& mac, std::uint64_t now);
     bool action(ActionKind kind, std::uint64_t now, Action& output) const;
     void message(const char* text);

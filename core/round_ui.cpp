@@ -23,11 +23,21 @@ const Peer* State::find(const awdl::Mac& mac) const {
             return &peer;
     return nullptr;
 }
+bool State::observed(const Peer& peer, std::uint64_t now) const {
+    return peer.used && now >= peer.seen && now - peer.seen < peer_lifetime_us;
+}
 bool State::eligible(const Peer& peer, std::uint64_t now) const {
-    return peer.used && peer.port && now >= peer.seen && now >= peer.advertised_at &&
-           now - peer.seen < peer_lifetime_us && now - peer.advertised_at < peer_lifetime_us;
+    return observed(peer, now) && peer.port && peer.advertised_at && now >= peer.advertised_at &&
+           now - peer.advertised_at < peer_lifetime_us;
 }
 unsigned State::count(std::uint64_t now) const {
+    unsigned count = 0;
+    for (const auto& peer : peers)
+        if (observed(peer, now))
+            ++count;
+    return count;
+}
+unsigned State::ready_count(std::uint64_t now) const {
     unsigned count = 0;
     for (const auto& peer : peers)
         if (eligible(peer, now))
@@ -39,9 +49,7 @@ void State::observe(const awdl::PeerTable& table, std::uint64_t now) {
         if (peer.used && (now < peer.seen || now - peer.seen >= peer_lifetime_us))
             peer.used = false;
     for (const auto& source : table.rows()) {
-        if (!source.used || !source.announcement.service.airdrop ||
-            !source.announcement.service.port || now < source.seen_us ||
-            now - source.seen_us >= peer_lifetime_us)
+        if (!source.used || now < source.seen_us || now - source.seen_us >= peer_lifetime_us)
             continue;
         Peer* destination = nullptr;
         for (auto& peer : peers)
@@ -60,7 +68,8 @@ void State::observe(const awdl::PeerTable& table, std::uint64_t now) {
             destination->mac = source.announcement.source;
         }
         destination->used = true;
-        destination->port = source.announcement.service.port;
+        destination->port =
+            source.announcement.service.airdrop ? source.announcement.service.port : 0;
         destination->seen = source.seen_us;
         destination->advertised_at = source.service_received_us;
         destination->rssi = source.rssi;
@@ -82,7 +91,7 @@ bool State::set_name(const awdl::Mac& mac, const char* name) {
 }
 bool State::select(const awdl::Mac& mac, std::uint64_t now) {
     const auto* peer = find(mac);
-    if (!peer || !eligible(*peer, now))
+    if (!peer || !observed(*peer, now))
         return false;
     selected = mac;
     ++revision;

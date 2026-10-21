@@ -267,15 +267,16 @@ bool diagnostic_command(const char* command) {
         const int size = std::snprintf(
             line, sizeof(line),
             "{\"event\":\"round_status\",\"board\":\"spotpear-s3-180-v1\",\"idf\":\"%s\",\"radio_"
-            "ready\":%s,\"peers\":%u,\"brightness\":%u,\"flushes\":%u,\"display_errors\":%u,"
+            "ready\":%s,\"peers\":%u,\"airdrop_ready\":%u,\"brightness\":%u,\"flushes\":%u,"
+            "\"display_errors\":%u,"
             "\"touch_samples\":%u,\"touch_errors\":%u,\"touches\":%u,\"touch_x\":%d,\"touch_y\":%d,"
             "\"pressed\":%s,\"receive_phase\":%u,\"send_phase\":%u,\"internal_free\":%u,\"internal_"
             "largest\":%u,\"internal_min\":%u,\"psram_free\":%u,\"uptime_ms\":%llu,\"reset_"
             "reason\":%u,\"main_stack_free\":%u,\"ui_stack_free\":%u}\n",
             esp_get_idf_version(), snapshot.radio_ready ? "true" : "false", snapshot.count(now()),
-            snapshot.brightness, frames.load(), display_errors.load(), touch_samples.load(),
-            touch_errors.load(), touches.load(), touch_x.load(), touch_y.load(),
-            touch_down ? "true" : "false", unsigned(snapshot.transfers[0].phase),
+            snapshot.ready_count(now()), snapshot.brightness, frames.load(), display_errors.load(),
+            touch_samples.load(), touch_errors.load(), touches.load(), touch_x.load(),
+            touch_y.load(), touch_down ? "true" : "false", unsigned(snapshot.transfers[0].phase),
             unsigned(snapshot.transfers[1].phase),
             unsigned(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
             unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)),

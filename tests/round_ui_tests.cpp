@@ -74,4 +74,32 @@ int main() {
     send.phase = round_ui::Phase::sending;
     state.host_reply(true, "cancelled", 14'000'003);
     assert(send.phase == round_ui::Phase::sending);  // Wait for the native worker outcome.
+    // A live AWDL neighbor remains visible without a fresh AirDrop offer.
+    round_ui::State observed_state;
+    awdl::PeerTable observed_table;
+    awdl::Announcement live{};
+    live.source = {2, 5, 4, 3, 2, 1};
+    observed_table.update(live, -73, 1'000'000);
+    observed_state.observe(observed_table, 1'000'001);
+    assert(observed_state.count(1'000'001) == 1 && observed_state.ready_count(1'000'001) == 0);
+    assert(observed_state.select(live.source, 1'000'001));
+    assert(!observed_state.action(round_ui::ActionKind::allow, 1'000'001, action));
+    assert(!observed_state.action(round_ui::ActionKind::resolve, 1'000'001, action));
+    live.service.airdrop = true;
+    live.service.port = 8770;
+    observed_table.update(live, -73, 2'000'000);
+    observed_state.observe(observed_table, 2'000'001);
+    assert(observed_state.ready_count(2'000'001) == 1);
+    assert(observed_state.action(round_ui::ActionKind::allow, 2'000'001, action));
+    live.service = {};
+    for (auto time : {5'000'000ull, 9'000'000ull, 13'000'000ull}) {
+        observed_table.update(live, -73, time);
+        observed_state.observe(observed_table, time + 1);
+    }
+    assert(observed_state.count(13'000'001) == 1 && observed_state.ready_count(13'000'001) == 0);
+    assert(observed_state.select(live.source, 13'000'001));
+    assert(!observed_state.action(round_ui::ActionKind::allow, 13'000'001, action));
+    assert(!observed_state.action(round_ui::ActionKind::resolve, 13'000'001, action));
+    assert(observed_state.count(23'000'001) == 0);
+    assert(observed_state.count(0) == 0);
 }
