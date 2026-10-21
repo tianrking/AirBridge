@@ -98,6 +98,11 @@ void native_tests() {
     for(std::size_t n=0;n<40;n++) check(parse_ask({ask_fixture.data(),n},ask)!=Error::none,"short Ask cannot allocate files");
     const airbridge::awdl::Mac mac{2,1,2,3,4,5};MdnsPacket announcement{};
     check(mdns_announcement(mac,8770,0,announcement)==Error::none && announcement.size<512 && announcement.bytes[2]==0x84 && announcement.bytes[7]==4,"bounded mDNS announcement contains four answers");
+    const std::string wire_host="airbridge-020102030405";
+    check(std::search(announcement.bytes.begin(),announcement.bytes.begin()+std::ptrdiff_t(announcement.size),wire_host.begin(),wire_host.end())!=announcement.bytes.begin()+std::ptrdiff_t(announcement.size),"mDNS host retains the complete twelve-digit identity");
+    MdnsPacket maximum_label{};const airbridge::awdl::Mac maximum_mac{0xfe,0xff,0xff,0xff,0xff,0xff};
+    const std::string maximum_host="airbridge-feffffffffff";
+    check(mdns_announcement(maximum_mac,8770,0,maximum_label)==Error::none && std::search(maximum_label.bytes.begin(),maximum_label.bytes.begin()+std::ptrdiff_t(maximum_label.size),maximum_host.begin(),maximum_host.end())!=maximum_label.bytes.begin()+std::ptrdiff_t(maximum_label.size),"mDNS host remains bounded with maximum octets");
     const auto ip=airbridge::awdl::link_local(mac);check(std::equal(ip.begin(),ip.end(),announcement.bytes.begin()+std::ptrdiff_t(announcement.size-16)),"mDNS AAAA matches actual AWDL identity");
     const std::uint8_t query[]{0,0,0,0,0,1,0,0,0,0,0,0,8,'_','a','i','r','d','r','o','p',4,'_','t','c','p',5,'l','o','c','a','l',0,0,12,0,1};
     check(mdns_question({query,sizeof(query)},mac),"literal AirDrop PTR question matches");

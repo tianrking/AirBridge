@@ -16,7 +16,7 @@ Date: 2026-10-21. This is a bounded hardware acceptance record for the **Spotpea
 | Full preflash backup | 16,777,216 bytes retained privately; SHA-256 `4217fec89e88ab0ce9276569f311f6dc1772af8283087f662ea71fbbdd249c31` |
 | Program verification | Bootloader, partition table and application independently read back and byte-compared; all match |
 | NVS preservation during programming | 24,576 bytes read before/after and equal |
-| Current application | 1,565,984 bytes; SHA-256 `b6f50e3a510a98356db5c088497ddc19bec96aa4aef3d6dd2c7e18b149a08fdb` |
+| Current application | 1,565,984 bytes; SHA-256 `9abafa73776e42b4ba598e33623882048104694157db13cc3f20d44647f75138` |
 | Wireless startup | `radio_ready=true`; Wi-Fi, BLE, native command/server/mDNS tasks started |
 | Nearby services | Two fresh AirDrop advertisements observed during bring-up; presence expires when advertisements stop |
 | Host protocol | Real AB2 HELLO and STATUS accepted; protocol 2 and 112-byte chunk capability returned |
@@ -41,5 +41,7 @@ The first build overflowed the standard main-task stack during screen initializa
 - Native `/Discover` name resolution was attempted against a real observed peer, but timed out (`-116`, HTTP status 0). The UI must retain an unverified host hint and a failure notice in that case.
 - The previously authorized Mac SSH address did not respond during this run. **This round/public profile has not yet passed a fresh native Apple→Windows→Apple file transfer with SHA-256 comparison.** Earlier development-profile transfer evidence is not transferred to this build.
 - No SD, audio, battery, standalone on-board storage, electrical measurements, long-duration soak or power-loss-during-transfer qualification was performed.
+
+The Linux/GCC policy build additionally found a pre-existing `snprintf` truncation warning in mDNS hostname formatting. The hostname now explicitly uses the 12 hexadecimal identity characters; regression checks cover the exact normal and maximum-octet labels. Compiler warnings remain errors. The final firmware was rebuilt, flashed and independently read back after this change.
 
 Private NVS/full-flash backups, nearby addresses and raw session logs are kept under ignored `work/round-display/`; they are not published. The dedicated round CI produces a distinct firmware artifact and cannot qualify hardware. Standard Pages deployment remains restricted to `main`.

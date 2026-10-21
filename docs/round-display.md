@@ -45,6 +45,8 @@ The command uses absolute configuration paths so it works from the repository ro
 
 ## Flash and recovery
 
+Use an activated ESP-IDF 6.1 Python environment, or install `esptool==5.5.0` and `pyserial==3.5` in a dedicated environment for the programming helper.
+
 Close the browser/desktop bridge and all serial monitors first. No other application may own the port. Identify the intended board with `python -m serial.tools.list_ports -v`; do not assume a COM number identifies a physical board.
 
 ```powershell

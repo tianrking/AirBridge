@@ -18,7 +18,7 @@ bool same(std::string_view left,std::string_view right) {
 }
 void labels(const awdl::Mac& own,char* instance,char* host) {
     std::snprintf(instance,64,"%02x%02x%02x%02x%02x%02x",own[0],own[1],own[2],own[3],own[4],own[5]);
-    std::snprintf(host,64,"airbridge-%s.local",instance);
+    std::snprintf(host,64,"airbridge-%.12s.local",instance);
 }
 struct DnsWriter {
     MdnsPacket result{};bool good{true};
