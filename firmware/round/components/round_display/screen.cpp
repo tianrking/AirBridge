@@ -28,6 +28,7 @@ lv_obj_t* brightness_label;
 round_ui::State* snapshot;
 awdl::Mac row_macs[2]{};
 unsigned page{}, offset{};
+int pulse_angle{-1};
 std::uint64_t last_tick{}, last_update{};
 std::uint8_t* framebuffer;
 SemaphoreHandle_t framebuffer_mutex;
@@ -144,6 +145,7 @@ void change_page(unsigned target) {
         label(titles[page], 118, 48, 170, &lv_font_montserrat_20);
     }
     if (page == 0) {
+        pulse_angle = -1;
         pulse = lv_arc_create(page_root);
         lv_obj_set_size(pulse, 318, 318);
         lv_obj_center(pulse);
@@ -154,6 +156,7 @@ void change_page(unsigned target) {
         lv_obj_set_style_arc_color(pulse, lv_color_hex(0x1b3e4d), LV_PART_MAIN);
         lv_obj_set_style_arc_width(pulse, 3, LV_PART_INDICATOR);
         lv_obj_set_style_arc_color(pulse, lv_color_hex(accent), LV_PART_INDICATOR);
+        lv_obj_set_style_arc_opa(pulse, LV_OPA_TRANSP, LV_PART_INDICATOR);
         lv_obj_clear_flag(pulse, LV_OBJ_FLAG_CLICKABLE);
         heading = label("STARTING", 95, 73, 170, &lv_font_montserrat_14, accent);
         label("AirBridge", 60, 119, 240, &lv_font_montserrat_36);
@@ -258,8 +261,19 @@ void update(std::uint64_t now) {
                             now - snapshot->host_activity < 30'000'000;
         label_text(subcaption,
                    active ? "USB host recently active" : "Connect a PC to transfer files");
-        const int angle = int((now / 18000) % 360);
-        lv_arc_set_angles(pulse, angle, angle + 62);
+        const bool transferring = snapshot->transfers[0].phase == round_ui::Phase::receiving ||
+                                  snapshot->transfers[1].phase == round_ui::Phase::sending;
+        if (transferring) {
+            const int angle = int((now / 18000) % 360);
+            if (pulse_angle < 0)
+                lv_obj_set_style_arc_opa(pulse, LV_OPA_COVER, LV_PART_INDICATOR);
+            if (pulse_angle != angle)
+                lv_arc_set_angles(pulse, angle, angle + 62);
+            pulse_angle = angle;
+        } else if (pulse_angle >= 0) {
+            lv_obj_set_style_arc_opa(pulse, LV_OPA_TRANSP, LV_PART_INDICATOR);
+            pulse_angle = -1;
+        }
     } else if (page == 1 && !touch_down) {
         const round_ui::Peer* visible[12]{};
         unsigned count = 0;

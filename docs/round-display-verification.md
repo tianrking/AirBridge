@@ -16,7 +16,7 @@ Date: 2026-10-21. This is a bounded hardware acceptance record for the **Spotpea
 | Full preflash backup | 16,777,216 bytes retained privately; SHA-256 `4217fec89e88ab0ce9276569f311f6dc1772af8283087f662ea71fbbdd249c31` |
 | Program verification | Bootloader, partition table and application independently read back and byte-compared; all match |
 | NVS preservation during programming | 24,576 bytes read before/after and equal |
-| Current application | 1,566,240 bytes; SHA-256 `0fc38a2564946b593976105c35ab640fb8e31633348e93704ef1bbc91359502c` |
+| Current application | 1,566,368 bytes; SHA-256 `bdccbe0d5ce0d57de308f809feb4ce7c879a996b541308caa1f114c6d9439c29` |
 | Wireless startup | `radio_ready=true`; Wi-Fi, BLE, native command/server/mDNS tasks started |
 | Nearby services | Two fresh AirDrop advertisements observed during bring-up; presence expires when advertisements stop |
 | Host protocol | Real AB2 HELLO and STATUS accepted; protocol 2 and 112-byte chunk capability returned |
@@ -58,4 +58,10 @@ The corrected model keeps all recently observed AWDL neighbors in the list and r
 
 The updated image was flashed only to the explicitly identified COM4 board; all three segments matched independent readback and NVS was preserved. Validation reads status without automatic navigation.
 
-In sixteen consecutive post-fix samples, `peers` remained 2–3 while `airdrop_ready` stayed 0. Display/touch error counters remained zero and radio startup remained ready. This confirms that unready but recently observed neighbors are no longer hidden by the model; physical list confirmation is recorded separately when supplied.
+In sixteen consecutive post-fix samples, `peers` remained 2–3 while `airdrop_ready` stayed 0. Display/touch error counters remained zero and radio startup remained ready. This confirms that unready but recently observed neighbors are no longer hidden by the model; the user subsequently confirmed that entries are visible after manually tapping Devices.
+
+## Idle ring behavior
+
+The home ring stays static while idle, discovering neighbors, preparing files, verifying, or showing a terminal transfer result. Its colored segment is visible and rotates only in the native sending or receiving phase; it is hidden again when that phase ends. Background discovery does not trigger animation.
+
+The updated image was built with ESP-IDF 6.1, flashed to the explicitly identified board, independently read back and compared, with NVS preserved. Two live home framebuffer captures taken more than two seconds apart had zero changed pixels across the 9,872-pixel outer-ring annulus. Radio remained ready with zero display/touch errors. No automatic page navigation or native file transfer was used for this check; active-transfer animation awaits a native transfer session.

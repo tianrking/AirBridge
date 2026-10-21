@@ -72,7 +72,7 @@ This overwrites the previous application. A failed/partial install requires rein
 
 ## On-screen controls
 
-- **Home:** moving AWDL ring, separate live-neighbor and AirDrop-ready counts, and recent valid USB-host activity. A recently observed AWDL source stays visible even without a fresh AirDrop service advertisement; it is not presented as ready to transfer.
+- **Home:** a static outer ring while idle, with rotation only during native sending or receiving; separate live-neighbor and AirDrop-ready counts, and recent valid USB-host activity. A recently observed AWDL source stays visible even without a fresh AirDrop service advertisement; it is not presented as ready to transfer.
 - **Devices:** two rows per page, previous/next navigation, observed hostname or a native resolved name, address and actual RSSI. Touch any recently observed row for its details. Selection is tied to the address, not a recycled list index. Details distinguish an unannounced/expired AirDrop service from a device that is no longer nearby. Allow/name actions require a fresh AirDrop service and remain disabled otherwise.
 - **Read name:** performs the existing TLS/native `/Discover` request. A host hint stays explicitly unverified until that succeeds. The compact CJK fallback includes common characters; unsupported glyphs may display a placeholder, with the MAC retained for identification.
 - **Allow sender / Revoke access:** changes the same session peer authorization used by the host. A new host HELLO session clears authorization as in the standard public firmware. This is not verified Apple-account/contact authentication. Busy/receiving conflicts are refused.
