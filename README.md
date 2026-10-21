@@ -18,6 +18,10 @@ CI runs on every push and pull request; [version-tag releases require the same c
 
 AirBridge puts Wi-Fi and Bluetooth on an ESP32-S3 and connects it to Windows over serial. A portable C++17 core implements AWDL framing, synchronization and protocol parsing; ESP-IDF 6.1 provides the radio backend. One React/TypeScript interface supports a direct Web Serial browser backend and the retained Tauri 2/Rust desktop backend.
 
+## Round display edition
+
+This **`round-display` branch** adds a local touch interface for the Spotpear ESP32-S3R8 1.8-inch Round V1. The standard firmware, web app and Tauri client remain together on `main`. See the [board guide](docs/round-display.md) and [measured hardware verification](docs/round-display-verification.md) before flashing this distinct profile.
+
 ## Get v0.0.1
 
 **[Downloads](https://github.com/tianrking/AirBridge/releases/tag/v0.0.1)** ·
